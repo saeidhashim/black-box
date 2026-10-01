@@ -1,3 +1,5 @@
+![Black Box banner](https://github.com/user-attachments/assets/78603ca3-a189-4eee-a189-7810aa112a45)
+
 # Black Box
 
 ### AI agents do the work. Black Box keeps them accountable.
