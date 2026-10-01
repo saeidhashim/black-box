@@ -6,6 +6,8 @@ A hackathon prototype by **Saeid Hashim**.
 
 Give an agent clear boundaries. Watch its work. Keep the blocked attempts in the record. Let a human make the final decision.
 
+![Black Box overview](https://github.com/user-attachments/assets/d50a005f-de0f-4d3c-a8f8-806935c7532b)
+
 ## Try it
 
 [Open the live Black Box app](https://saeidhashim.github.io/black-box/) in your browser.
@@ -17,7 +19,7 @@ Or run it offline:
 3. Open **Agents**, choose an issue, and follow the five stages.
 4. Select an employee and enter the demo password **1234** to sign off.
 
-No install, build step, API key, or internet connection is needed to run the app. The video and screenshots are optional; the app itself is a single HTML file.
+No install, build step, API key, or internet connection is needed to run the app. The app is a single HTML file.
 
 ## One issue. Five stages.
 
@@ -39,6 +41,8 @@ The stage bar and timer stay visible as the incident moves forward. Earlier stag
 - **Human control:** risky repairs wait for approval. Sign-off records the selected employee.
 - **Records and Reviews:** revisit saved incidents, inspect evidence, and export the record as JSON.
 - **Offline PDF brief:** a two-page summary explains the cause, repair, blocked action, outcome, and sign-off status.
+
+![Employee sign-off](https://github.com/user-attachments/assets/6bbcbdf9-10d6-4544-87bf-39f7882b969e)
 
 ## What this prototype does not claim
 
