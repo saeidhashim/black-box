@@ -1,0 +1,610 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Black Box | Agent accountability</title><style>
+  :root{
+    --bg:#f7f7f7; --card:#ffffff; --border:#e7e7e7; --border2:#efefef;
+    --text:#171717; --sub:#727272; --faint:#a8a8a8;
+    --vio:#434343; --vio2:#555555; --vio-soft:#efefef; --vio-line:#d9d9d9;
+    --green:#7e7e7e; --green-soft:#f4f4f4; --red:#4d4d4d; --red-soft:#f3f3f3; --red-line:#dbdbdb;
+    --amber:#7b7b7b; --amber-soft:#f7f7f7;
+    --sh:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.07);
+    --sh-lg:0 8px 30px rgba(16,24,40,.14);
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,'Helvetica Neue',Arial,sans-serif;
+    --mono:ui-monospace,'SF Mono','Cascadia Mono',Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13.5px;display:flex;flex-direction:column;overflow:hidden}
+  /* top bar */
+  .topbar{flex:none;height:56px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:0 18px}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;letter-spacing:-.2px}
+  .brand .mk{width:26px;height:26px;border-radius:7px;background:#171717;position:relative;flex:none}
+  .brand .mk::after{content:"";position:absolute;inset:8px;border-radius:3px;background:#ffffff}
+  .brand .mk::before{content:"";position:absolute;inset:11px;border-radius:2px;background:var(--vio2);z-index:1}
+  .brand .dot{width:7px;height:7px;border-radius:50%;background:var(--vio2)}
+  .topright{margin-left:auto;display:flex;align-items:center;gap:12px}
+  .envpill{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--sub);border:1px solid var(--border);border-radius:99px;padding:4px 10px}
+  .envpill i{width:7px;height:7px;border-radius:50%;background:var(--green)}
+  .avatar{width:28px;height:28px;border-radius:50%;background:var(--vio-soft);color:var(--vio);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  /* layout */
+  .shell{flex:1;display:flex;min-height:0}
+  .side{flex:none;width:224px;background:var(--card);border-right:1px solid var(--border);padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+  .navitem{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;color:var(--sub);font-size:13px;font-weight:500}
+  .navitem svg{width:15px;height:15px;flex:none}
+  .navitem.active{background:var(--vio-soft);color:var(--vio);font-weight:600}
+  .secttl{font-size:10.5px;font-weight:700;letter-spacing:.6px;color:var(--faint);padding:16px 10px 6px;text-transform:uppercase}
+  .agentrow{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12.5px;color:var(--sub)}
+  .agentrow i{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none}
+  .agentrow.live{color:var(--text);font-weight:600}
+  .agentrow.live i{background:var(--vio2);animation:pulse 1.6s infinite}
+  .sidefoot{margin-top:auto;padding:12px 10px;font-size:11px;color:var(--faint);line-height:1.5;border-top:1px solid var(--border2)}
+  @keyframes pulse{50%{opacity:.3}}
+  .main{flex:1;overflow-y:auto;padding:20px 24px}
+  .crumb{font-size:12px;color:var(--faint);margin-bottom:6px}
+  .mainhead{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+  .mainhead h1{font-size:19px;font-weight:700;letter-spacing:-.3px}
+  .pill{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:99px;display:inline-flex;align-items:center;gap:5px}
+  .pill.vio{background:var(--vio-soft);color:var(--vio)}
+  .pill.grn{background:var(--green-soft);color:var(--green)}
+  .pill.red{background:var(--red-soft);color:var(--red)}
+  .pill.gry{background:#272727;color:var(--sub)}
+  .grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px;align-items:start}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--sh)}
+  .chead{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border2);font-size:13px;font-weight:600}
+  .chead svg{width:15px;height:15px;color:var(--sub)}
+  .chead .right{margin-left:auto}
+  .cbody{padding:14px 16px}
+  /* activity feed */
+  .feed{display:flex;flex-direction:column}
+  .fitem{display:flex;gap:11px;padding:9px 2px;border-bottom:1px solid var(--border2);animation:fadeUp .4s ease-out}
+  .fitem:last-child{border-bottom:none}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}}
+  .ficon{width:30px;height:30px;border-radius:9px;background:var(--vio-soft);color:var(--vio);display:flex;align-items:center;justify-content:center;flex:none}
+  .ficon svg{width:15px;height:15px}
+  .ficon.bad{background:var(--red-soft);color:var(--red)}
+  .ficon.ok{background:var(--green-soft);color:var(--green)}
+  .fbody{flex:1;min-width:0}
+  .fact{font-weight:500;font-size:13px}
+  .fres{font-size:12.5px;color:var(--sub);margin-top:2px;animation:fadeUp .3s ease-out}
+  .fres b{color:var(--text);font-weight:600}
+  .ftime{font-size:11px;color:var(--faint);flex:none;padding-top:2px}
+  .spin{width:14px;height:14px;border:2px solid var(--vio-line);border-top-color:var(--vio2);border-radius:50%;animation:rot .7s linear infinite;display:inline-block;vertical-align:-3px}
+  @keyframes rot{to{transform:rotate(360deg)}}
+  .empty{padding:34px 10px;text-align:center;color:var(--faint);font-size:12.5px;line-height:1.7}
+  /* warrant */
+  .wrow{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:12.5px;border-bottom:1px solid var(--border2)}
+  .wrow:last-child{border-bottom:none}
+  .wrow svg{width:14px;height:14px;flex:none}
+  .wrow .ok{color:var(--green)}
+  .wrow .no{color:var(--red)}
+  .wtask{background:var(--vio-soft);border:1px solid var(--vio-line);border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;line-height:1.5}
+  .wtask b{color:var(--vio)}
+  .wlbl{font-size:10.5px;font-weight:700;letter-spacing:.6px;color:var(--faint);text-transform:uppercase;margin:10px 0 2px}
+  .expiry{margin-top:12px}
+  .expiry .erow{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-bottom:5px}
+  .expiry .erow b{color:var(--text);font-variant-numeric:tabular-nums}
+  .bar{height:5px;background:#f2f2f2;border-radius:99px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--vio2);border-radius:99px;transition:width 1s linear}
+  /* audit log */
+  .log{display:flex;flex-direction:column}
+  .lrow{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--border2);font-size:12.5px;animation:fadeUp .35s ease-out}
+  .lrow:last-child{border-bottom:none}
+  .ldot{width:8px;height:8px;border-radius:50%;flex:none}
+  .ldot.g{background:var(--green)}.ldot.r{background:var(--red)}.ldot.v{background:var(--vio2)}
+  .lact{flex:1;min-width:0}
+  .lact .sub{display:block;font-size:11px;color:var(--faint);margin-top:1px}
+  .ltime{font-size:11px;color:var(--faint);flex:none;font-variant-numeric:tabular-nums}
+  .lhash{font-family:var(--mono);font-size:10.5px;color:var(--faint);flex:none}
+  .lchk{color:var(--green);font-size:12px;flex:none}
+  /* IA review */
+  #iaCard{display:none;margin-top:16px;animation:fadeUp .5s ease-out}
+  #iaCard.show{display:block}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+  .stat{border:1px solid var(--border2);border-radius:10px;padding:10px 12px}
+  .stat .k{font-size:10.5px;font-weight:700;letter-spacing:.5px;color:var(--faint);text-transform:uppercase}
+  .stat .v{font-size:16px;font-weight:700;margin-top:3px}
+  .stat .v.g{color:var(--green)}.stat .v.r{color:var(--red)}.stat .v.v{color:var(--vio)}
+  .flag{display:flex;gap:10px;background:var(--red-soft);border:1px solid var(--red-line);border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.55;margin-bottom:12px}
+  .flag svg{width:15px;height:15px;color:var(--red);flex:none;margin-top:1px}
+  .flag b{color:var(--red)}
+  .recrow{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .recrow .lbl{font-size:12px;color:var(--sub)}
+  .btn{border:none;border-radius:9px;font-family:var(--sans);font-weight:600;cursor:pointer;font-size:13px;padding:10px 16px}
+  .btn.pri{background:var(--vio2);color:#ffffff;width:100%;padding:12px}
+  .btn.pri:hover{background:var(--vio)}
+  .btn.ghost{background:#ffffff;border:1px solid var(--border);color:var(--sub)}
+  /* modals */
+  .ovl{position:fixed;inset:0;background:rgba(23,23,28,.45);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:50}
+  .ovl.show{display:flex}
+  .modal{background:var(--card);border-radius:14px;box-shadow:var(--sh-lg);width:440px;max-width:92vw;padding:26px 28px;animation:pop .35s cubic-bezier(.2,.9,.3,1.2)}
+  @keyframes pop{from{opacity:0;transform:scale(.92) translateY(10px)}}
+  .mtag{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:1.2px;color:var(--vio);background:var(--vio-soft);border-radius:6px;padding:4px 8px;margin-bottom:14px;text-transform:uppercase}
+  .modal h2{font-size:20px;font-weight:700;letter-spacing:-.3px;line-height:1.3;margin-bottom:10px}
+  .modal p{font-size:13px;color:var(--sub);line-height:1.65;margin-bottom:18px}
+  /* denied modal */
+  .dicon{width:44px;height:44px;border-radius:12px;background:var(--red-soft);color:var(--red);display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+  .dicon svg{width:22px;height:22px}
+  .dreason{background:#fafafa;border:1px solid var(--border2);border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:12px}
+  .dreason .k{font-size:10.5px;font-weight:700;letter-spacing:.5px;color:var(--faint);text-transform:uppercase;display:block;margin-bottom:2px}
+  .dnote{display:flex;gap:8px;font-size:12px;color:var(--sub);align-items:center}
+  .dnote svg{width:13px;height:13px;color:var(--vio);flex:none}
+  /* certificate */
+  .cert{text-align:center}
+  .sealwrap{display:flex;justify-content:center;margin-bottom:14px}
+  .cert h2{margin-bottom:4px}
+  .cert .csub{font-size:12.5px;color:var(--sub);margin-bottom:18px}
+  .cgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:left;margin-bottom:16px}
+  .cgrid .cell{border:1px solid var(--border2);border-radius:9px;padding:8px 11px}
+  .cgrid .k{font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--faint);text-transform:uppercase}
+  .cgrid .v{font-size:12.5px;font-weight:600;margin-top:2px}
+  .cgrid .v.g{color:var(--green)}
+  .signed{display:flex;align-items:center;gap:8px;justify-content:center;font-size:12px;color:var(--sub);margin-bottom:6px}
+  .signed b{color:var(--text)}
+  .tagline{font-size:12.5px;color:var(--vio);font-weight:600;margin-bottom:18px}
+  /* speed controls */
+  .speedctl{position:fixed;right:16px;bottom:16px;z-index:60;background:var(--card);border:1px solid var(--border);border-radius:99px;box-shadow:var(--sh);display:flex;align-items:center;gap:2px;padding:4px 6px}
+  .speedctl button{border:none;background:transparent;width:28px;height:28px;border-radius:50%;cursor:pointer;color:var(--sub);font-size:13px;display:flex;align-items:center;justify-content:center}
+  .speedctl button:hover{background:#f2f2f2;color:var(--text)}
+  .speedctl .lbl{font-size:11px;font-weight:600;color:var(--sub);min-width:34px;text-align:center;font-variant-numeric:tabular-nums}
+  @media (max-width:1020px){.side{display:none}.grid{grid-template-columns:1fr}}
+
+:root{--bg:#0e0e0e;--card:#161616;--border:#2b2b2b;--border2:#262626;--text:#f0f0f0;--sub:#a7a7a7;--faint:#818181;--vio:#b3b3b3;--vio2:#9a9a9a;--vio-soft:#232323;--vio-line:#3c3c3c;--green:#bebebe;--green-soft:#2d2d2d;--red:#a3a3a3;--red-soft:#272727;--red-line:#494949;--sh:0 6px 24px #00000022;--sh-lg:0 28px 90px #00000088}
+body{font-size:14px;background:radial-gradient(ellipse at 85% 0,#1c1c1c77,transparent 55%),var(--bg)}
+button{font-family:var(--sans)}button:focus-visible{outline:2px solid var(--vio2);outline-offset:4px}
+.topbar{height:68px;background:#101010;border-color:var(--border);padding:0 26px}.brand{font-size:19px;letter-spacing:-.6px;gap:12px}.brand .mk{background:linear-gradient(135deg,#adadad,#636363);box-shadow:0 0 28px #9a9a9a22;width:32px;height:32px}.brand .mk:after{background:#161616}.brand .mk:before{background:#c2c2c2}
+.side{width:210px;background:#101010;padding:22px 12px}.navitem{padding:11px 12px;margin:2px 0}.navitem:not(.active){opacity:.65}.main{padding:26px 32px 64px}.crumb{font-size:12px;margin-bottom:12px}.mainhead{margin-bottom:20px}.mainhead h1{font-size:24px}.envpill{color:var(--sub)}.avatar{background:#262626}.card{border-radius:15px}.chead{padding:15px 18px;font-size:13px}.cbody{padding:16px 18px}.btn.pri{color:#141414;background:linear-gradient(115deg,#b5b5b5,#8e8e8e);box-shadow:0 4px 20px #8e8e8e20}.btn.pri:hover{background:#bdbdbd;transform:translateY(-1px)}.btn.ghost{background:#252525;color:var(--text)}
+.info{display:inline-flex;align-items:center;justify-content:center;border:1px solid #4b4b4b;background:transparent;color:#9c9c9c;width:19px;height:19px;font:600 11px var(--sans);border-radius:50%;cursor:pointer;padding:0;margin-left:4px}.info:hover{color:var(--vio);border-color:var(--vio)}
+#tip{display:none;position:fixed;z-index:100;width:300px;padding:17px 19px;border:1px solid #454545;border-radius:12px;background:#252525;box-shadow:var(--sh-lg);font-size:13px;line-height:1.65;color:#dedede}#tip b{display:block;color:var(--vio);margin-bottom:5px}#tip.show{display:block;animation:fadeUp .2s}
+.eyebrow{color:var(--vio);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase}.intro{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin:10px 0 26px}.intro h1{font-size:34px;font-weight:650;letter-spacing:-1px;margin:5px 0 10px}.intro p{color:var(--sub);line-height:1.6;font-size:14px}.protection{background:linear-gradient(120deg,#1f1f1f,#1c1c1c);padding:14px 18px;border:1px solid #353535;border-radius:12px;max-width:320px;color:#c1c1c1;font-size:12px;line-height:1.6}.protection b{display:block;color:var(--text);margin-bottom:4px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}.metric{padding:18px 22px;border-radius:13px;border:1px solid var(--border);background:linear-gradient(120deg,#1c1c1c,#161616)}.metric strong{font-size:28px;font-weight:600;letter-spacing:-1px}.metric label{display:block;margin-top:6px;color:var(--sub);font-size:12px}.metric strong small{font-size:12px;color:var(--faint);font-weight:400;margin-left:8px;letter-spacing:0}
+.listhead{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--border)}.listhead b{font-size:14px}.listhead span{font-size:11px;color:var(--faint)}
+.issue{display:grid;grid-template-columns:105px 1fr 170px 90px;align-items:center;gap:18px;width:100%;padding:20px;text-align:left;color:var(--text);background:transparent;border:0;border-bottom:1px solid var(--border2);cursor:pointer;transition:background .2s,transform .2s}.issue:last-child{border-bottom:0}.issue:hover{background:#20202099}.issue:hover .launch{color:var(--vio);transform:translateX(3px)}.issue h3{font-size:14px;font-weight:550;letter-spacing:-.1px;margin:0 0 5px}.issue p{font-size:12px;color:var(--sub)}.issue .service{font-size:12px;color:var(--faint)}.launch{font-size:12px;color:var(--sub);text-align:right;transition:.2s}.sev{font-size:10px;font-weight:700;padding:5px 9px;border-radius:6px;display:inline-block;letter-spacing:.4px}.sev.critical{background:#2a2a2a;color:#b5b5b5}.sev.high{background:#2e2e2e;color:#bfbfbf}.sev.medium{background:#2b2b2b;color:#cdcdcd}.sev.low{background:#2b2b2b;color:#bbbbbb}
+.grid{grid-template-columns:minmax(0,1.15fr) minmax(0,.9fr);gap:20px}.feed{max-height:270px;overflow:auto;padding-right:6px}.fitem{padding:13px 0;gap:13px}.ficon{width:34px;height:34px;border-radius:10px}.fact{font-size:13px}.fres{font-size:12px;line-height:1.6}.log{max-height:255px;overflow:auto}.lrow{padding:11px 0}.lhash{display:none}.lchk{font-size:11px}.ltime{font-size:10px}.wtask{line-height:1.6}.wrow{padding:7px 0;font-size:12px}.wrow svg{width:13px}.wlbl{margin-top:9px}.expiry{margin-top:10px}
+.stagebar{display:flex;gap:8px;margin-bottom:20px}.stage{flex:1;border-top:2px solid #333333;padding-top:10px;color:var(--faint);font-size:11px}.stage.active{border-color:var(--vio2);color:var(--vio)}.stage.done{border-color:#bebebe77;color:var(--sub)}.stage em{font-style:normal;font-weight:600;margin-right:6px}
+.back{border:0;background:none;color:var(--sub);cursor:pointer;font-size:12px;padding:0}.back:hover{color:var(--vio)}.tasksubtitle{color:var(--sub);font-size:12px;margin:-8px 0 20px}.stats{gap:8px}.stat{padding:10px}.stat .k{font-size:9px}.stat .v{font-size:15px}.flag{font-size:12px}.stats .v.g{color:var(--green)}.recrow{flex-wrap:wrap}.iaCard{margin-top:16px}.modal{background:linear-gradient(140deg,#212121,#181818);border:1px solid #434343;padding:30px;width:480px;border-radius:18px}.modal h2{font-size:25px;letter-spacing:-.6px}.dreason{background:#171717;border-color:var(--border)}.ovl{background:#070707c9}.cert .cgrid{margin:20px 0}.cert .cell{background:#191919}.cert .signed{font-size:11px;flex-wrap:wrap}.speedctl{background:#242424;border-color:#3e3e3e;bottom:18px}.speedctl button:hover{background:#343434;color:var(--vio)}.speedctl .lbl{color:var(--vio)}.cert .tagline{font-size:13px}.subtle{color:var(--faint);font-size:11px}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:#3c3c3c;border-radius:9px}
+@media(max-width:1020px){.side{display:none}.grid{grid-template-columns:1fr}.main{padding:22px}.issue{grid-template-columns:85px 1fr 70px}.issue .service{display:none}.metrics{gap:8px}.metric{padding:14px}.intro h1{font-size:28px}.protection{display:none}.feed,.log{max-height:330px}}
+@media(max-width:560px){.issue{grid-template-columns:70px 1fr;gap:10px;padding:16px}.launch{display:none}.intro{margin-bottom:20px}.metrics .metric strong{font-size:22px}.metric label{font-size:10px}.mainhead{flex-wrap:wrap}.mainhead h1{font-size:22px}.stage{font-size:9px}.topbar{padding:0 20px}.stats{grid-template-columns:1fr 1fr}.modal{padding:24px}.speedctl{bottom:10px}}
+
+.navitem{cursor:pointer;opacity:1!important;border:0;text-align:left;background:transparent;font-family:var(--sans);width:100%;transition:background .2s,color .2s}.navitem:hover{background:#1e1e1e}.navitem.active{background:#232323}.side{padding-top:30px}.main{padding-bottom:64px}.speedctl{transition:opacity .2s}.speedctl.hidden{opacity:0;pointer-events:none}
+.hero{min-height:calc(100vh - 160px);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;overflow:hidden;position:relative}.hero h1{font-size:clamp(30px,4.2vw,60px);font-weight:550;line-height:1.16;letter-spacing:-2px;max-width:760px;z-index:2;margin:0}.hero h1 span{color:#b4b4b4}.core-scene{width:min(690px,90vw);height:420px;position:relative;perspective:1000px;margin-top:22px;isolation:isolate}.core-scene::before{content:'';position:absolute;width:340px;height:160px;left:50%;top:215px;transform:translateX(-50%);background:radial-gradient(ellipse,#6b6b6b30,transparent 65%);filter:blur(18px)}
+.core-space{position:absolute;top:150px;left:50%;transform-style:preserve-3d;transform:translate3d(var(--core-x,0px),var(--core-y,0px),0) rotateX(calc(-23deg + var(--core-rx,0deg))) rotateY(calc(-36deg + var(--core-ry,0deg)));animation:coreFloat 8s ease-in-out infinite}.cube3d{width:130px;height:130px;transform-style:preserve-3d;position:relative;left:-65px;top:-65px}.face{position:absolute;width:130px;height:130px;border:1px solid #b5b5b588;background:linear-gradient(135deg,#494949ee,#151515ee);box-shadow:inset 0 0 40px #93939316;display:flex;align-items:center;justify-content:center;backface-visibility:visible}.face.front{transform:translateZ(65px)}.face.back{transform:rotateY(180deg) translateZ(65px)}.face.left{transform:rotateY(-90deg) translateZ(65px)}.face.right{transform:rotateY(90deg) translateZ(65px)}.face.top{transform:rotateX(90deg) translateZ(65px);background:linear-gradient(135deg,#9b9b9b,#424242)}.face.bottom{transform:rotateX(-90deg) translateZ(65px)}.inner-mark{width:52px;height:52px;border:2px solid #b2b2b2;box-shadow:0 0 28px #a0a0a033;position:relative;border-radius:7px}.inner-mark:after{content:'';position:absolute;inset:13px;background:#bbbbbb;border-radius:3px;box-shadow:0 0 20px #acacac66}
+@keyframes coreFloat{0%,100%{transform:translate3d(var(--core-x,0px),var(--core-y,0px),0) rotateX(calc(-23deg + var(--core-rx,0deg))) rotateY(calc(-36deg + var(--core-ry,0deg)))}50%{transform:translate3d(var(--core-x,0px),calc(-12px + var(--core-y,0px)),0) rotateX(calc(-18deg + var(--core-rx,0deg))) rotateY(calc(-27deg + var(--core-ry,0deg)))}}
+.orbit{position:absolute;left:50%;top:150px;width:520px;height:190px;border:1px solid #53535366;border-radius:50%;transform:translate(-50%,-50%) rotate(-15deg);box-shadow:0 0 20px #6565650b}.orbit.two{width:380px;height:310px;transform:translate(-50%,-50%) rotate(37deg);border-style:dashed;opacity:.5}.dot3d{width:7px;height:7px;background:#c3c3c3;border-radius:50%;box-shadow:0 0 16px #a0a0a0;position:absolute;left:8%;top:27%}.dot3d.second{left:auto;right:6%;top:60%;background:#b9b9b9}
+.core-label{position:absolute;background:linear-gradient(125deg,#242424ee,#181818ee);border:1px solid #434343aa;box-shadow:0 12px 34px #00000044;backdrop-filter:blur(12px);padding:13px 16px;border-radius:11px;display:flex;gap:10px;align-items:center;text-align:left;font-size:12px;color:#e3e3e3;animation:labelFloat 6s ease-in-out infinite}.core-label svg{width:16px;height:16px;color:#adadad}.core-label small{display:block;color:#999999;font-size:10px;margin-top:4px}.core-label.a{left:5%;top:78px;transform:rotate(-4deg)}.core-label.b{right:1%;top:160px;animation-delay:-2s;transform:rotate(4deg)}.core-label.c{left:27%;top:285px;animation-delay:-4s;transform:rotate(-2deg)}@keyframes labelFloat{50%{translate:0 -7px}}
+.pagehead{display:flex;align-items:center;justify-content:space-between;margin-bottom:25px;gap:16px}.pagehead h1{font-size:30px;letter-spacing:-.8px;font-weight:600}.pagehead p{color:var(--sub);font-size:13px;margin-top:9px;line-height:1.6}.page-empty{min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;text-align:center;gap:14px}.page-empty .symbol{width:52px;height:52px;display:grid;place-items:center;border-radius:14px;background:var(--vio-soft);color:var(--vio)}.page-empty svg{width:23px;height:23px}.page-empty h2{font-size:18px;font-weight:550}.page-empty p{color:var(--sub);font-size:13px;line-height:1.7;max-width:400px}.page-empty .btn{width:auto;margin-top:8px}
+.session-row{display:flex;gap:16px;padding:20px;align-items:center;border-bottom:1px solid var(--border2)}.session-row:last-child{border:0}.session-row .name{flex:1}.session-row h3{font-size:14px;font-weight:550;margin-bottom:5px}.session-row p{font-size:12px;color:var(--sub);line-height:1.6}.session-row .btn{padding:8px 12px;font-size:12px}.recordDetail{margin-top:20px}.detail-head{padding:18px;display:flex;gap:12px;align-items:center;border-bottom:1px solid var(--border)}.detail-head strong{font-size:14px}.detail-head .pill{margin-left:auto}.evidence{padding:10px 18px}.e-row{padding:14px 0;border-bottom:1px solid var(--border2);font-size:12px}.e-row:last-child{border:0}.e-row .e-title{display:flex;gap:12px;color:var(--text);align-items:center}.e-row small{display:block;color:var(--sub);margin:5px 0}.fingerprint{display:block;font-family:var(--mono);font-size:10px;line-height:1.6;word-break:break-all;color:var(--faint)}.review-pane{padding:22px}.review-pane h2{font-size:18px;letter-spacing:-.3px;margin-bottom:8px}.review-pane p{color:var(--sub);font-size:13px;line-height:1.7}.review-pane .flag{margin-top:20px}.review-actions{display:flex;gap:10px;margin-top:20px}.review-actions .btn{width:auto}.review-meta{margin:20px 0;display:flex;gap:10px;flex-wrap:wrap}.tone-note{font-size:11px;color:var(--faint);margin-top:16px;line-height:1.6}
+@media(max-width:1020px){.side{display:flex;width:165px;flex:none}.core-scene{width:min(550px,90vw)}.core-label.a{left:0}.core-label.b{right:0}.orbit{width:420px}.hero h1{font-size:40px}.main{padding:24px}}
+@media(max-width:650px){.shell{flex-direction:column}.side{flex-direction:row;width:100%;padding:8px 12px;border-right:0;border-bottom:1px solid var(--border);gap:4px}.side .navitem{justify-content:center;font-size:11px;padding:9px 5px;gap:5px;margin:0}.side .navitem svg{width:13px}.side .secttl,.side .agentrow,.side .sidefoot{display:none!important}.hero{min-height:650px}.hero h1{font-size:34px;letter-spacing:-1.2px}.core-scene{height:380px;width:100%}.orbit{width:300px;height:170px}.orbit.two{width:230px;height:280px}.cube3d{scale:.8}.core-label{padding:10px;font-size:10px;gap:6px}.core-label.a{left:0;top:45px}.core-label.b{right:0;top:220px}.core-label.c{left:8%;top:310px}.session-row{flex-wrap:wrap;padding:16px}.session-row .name{min-width:180px}.pagehead h1{font-size:26px}.review-actions{flex-direction:column}.page-empty{padding:26px}.main{padding:22px 18px 70px}}
+@media(prefers-reduced-motion:reduce){.core-space,.core-label{animation:none}}
+.metrics,.protection{display:none}.intro{margin:10px 0 24px}.intro .eyebrow{display:none}.intro h1{font-size:30px}.intro p{font-size:13px}.issue{padding:22px 20px}.intro{justify-content:flex-start}
+.core-scene{--core-x:0px;--core-y:0px;--core-rx:0deg;--core-ry:0deg;touch-action:pan-y}
+.core-space{will-change:transform}.orbit,.core-label{translate:var(--core-label-x,0px) var(--core-label-y,0px);transition:translate .15s ease-out}
+@keyframes labelFloat{50%{translate:var(--core-label-x,0px) calc(-7px + var(--core-label-y,0px))}}
+@media(prefers-reduced-motion:reduce){.orbit,.core-label{translate:none!important}.core-space{will-change:auto}}
+
+.topbar{display:none!important}.side{padding-top:26px}.hero{min-height:calc(100vh - 100px)}
+.workflow{display:grid;grid-template-columns:220px minmax(0,1fr);gap:32px;align-items:start;margin-top:30px}.workflow .stagebar{display:flex;flex-direction:column;gap:12px;margin:0;position:sticky;top:24px}.workflow .stage{flex:none;display:flex;align-items:center;gap:12px;border:1px solid transparent;padding:16px 14px;border-radius:12px;font-size:13px;transition:background .3s,box-shadow .3s,border-color .3s}.workflow .stage em{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#232323;color:#929292;font-size:12px;margin:0;flex:none}.workflow .stage.active{color:#e3e3e3;background:linear-gradient(120deg,#2f2f2f,#1c1c1c);border-color:#7c7c7c;box-shadow:0 0 22px #94949433,inset 0 0 16px #ababab0a}.workflow .stage.active em{background:#a7a7a7;color:#141414;box-shadow:0 0 14px #a7a7a744}.workflow .stage.done{border-color:transparent;color:#a5a5a5}.workflow .stage.done em{color:#bcbcbc;background:#2e2e2e}
+.workflow .grid{display:block;min-width:0}.workflow .grid>div{display:contents}.workflow .card{display:none!important;margin:0!important}.workflow .card.revealed{display:block!important;margin-bottom:22px!important;animation:stageEnter .4s ease-out}.workflow .feed{max-height:430px}.workflow #warrantPanel{max-width:750px}.workflow #activityPanel{max-width:850px}.workflow #iaCard{max-width:850px}.workflow .stageNote{margin-bottom:14px;color:var(--sub);font-size:13px;line-height:1.7}.workflow .stageCopy{margin:20px 0;color:var(--sub);font-size:14px;line-height:1.8}.workflow .stageCopy b{color:var(--text)}.workflow #enforcePanel .feed{max-height:310px}.workflow .stats{margin-top:8px}.workflow .wrow{font-size:14px;padding:11px 0}.workflow .wtask{font-size:14px;padding:16px}.workflow .wlbl{margin-top:18px}.workflow .cbody{padding:22px}.workflow .chead{font-size:15px;padding:19px 22px}.stagebadge{font-size:11px;font-weight:600;padding:5px 10px;background:#232323;border-radius:99px;color:#b9b9b9}
+@keyframes stageEnter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:1020px){.workflow{grid-template-columns:175px minmax(0,1fr);gap:20px}.workflow .stage{padding:13px 10px;gap:8px;font-size:12px}}
+@media(max-width:650px){.workflow{grid-template-columns:112px minmax(0,1fr);gap:12px;margin-top:20px}.workflow .stage{flex-direction:column;align-items:flex-start;padding:12px 8px;font-size:10px;gap:7px}.workflow .stage em{width:24px;height:24px}.workflow .cbody{padding:14px}.workflow .chead{padding:14px;font-size:12px;flex-wrap:wrap}.workflow .wrow,.workflow .wtask{font-size:12px}.workflow .stageCopy{font-size:12px}.workflow .fact{font-size:12px}.workflow .ftime{display:none}.workflow .stageNote{font-size:11px}.workflow .stats{grid-template-columns:1fr 1fr}.workflow .flag{font-size:11px;display:block}.workflow .flag svg{margin-bottom:5px}.workflow .recrow{gap:6px}.workflow .recrow .lbl{font-size:11px}.workflow .recrow .pill{font-size:10px}.workflow .btn{font-size:11px;padding:10px}.hero{min-height:650px}}
+
+.workflow .feed,.workflow #enforcePanel .feed{max-height:none;overflow:visible;padding-right:0}
+.workflow .grid{overflow-anchor:none}.workflow .card{max-width:none!important;scroll-margin-top:24px}.workflow .stage{cursor:pointer;text-align:left;background:transparent;font-family:var(--sans);min-height:52px}.workflow .stage:disabled{cursor:default;opacity:.45}.workflow .stage:not(:disabled):hover{border-color:#4b4b4b}.workflow .stagebar{padding-bottom:55px}.workflow .stage-label{color:var(--vio);font-size:10px;letter-spacing:1.4px;text-transform:uppercase;font-weight:650;margin-right:4px}.workflow .chead{flex-wrap:wrap}.workflow .history-note{font-size:12px;color:var(--sub);line-height:1.7;margin:-10px 0 20px}.jump-current{position:fixed;right:18px;bottom:76px;z-index:55;background:#242424;border:1px solid #6e6e6e;color:#dedede;padding:12px 18px;border-radius:99px;box-shadow:0 8px 24px #00000055;cursor:pointer;font:600 12px var(--sans)}.jump-current[hidden]{display:none}.blocked-inline{padding:12px 14px;background:var(--red-soft);border:1px solid var(--red-line);border-radius:10px;font-size:12px;color:var(--red);line-height:1.7;margin-top:12px}.blocked-inline[hidden]{display:none}
+@media(max-width:650px){.workflow{grid-template-columns:88px minmax(0,1fr);gap:10px}.workflow .stagebar{top:12px;gap:6px}.workflow .stage{padding:10px 6px;font-size:10px;min-height:58px}.workflow .stage-label{font-size:9px}.workflow .chead{gap:6px}.jump-current{bottom:65px;right:10px;max-width:calc(100vw - 20px);font-size:11px;padding:12px 14px}.workflow .stats .stat{padding:8px}.workflow .history-note{font-size:11px}}
+
+/* Monochrome theme: surface depth and typography replace accent colors. */
+:root{--bg:#050505;--card:#101010;--border:#2a2a2a;--border2:#232323;--text:#f2f2f2;--sub:#b0b0b0;--faint:#888888;--vio:#eeeeee;--vio2:#ffffff;--vio-soft:#202020;--vio-line:#4b4b4b;--green:#d2d2d2;--green-soft:#202020;--red:#dedede;--red-soft:#1b1b1b;--red-line:#555555;--amber:#bbbbbb;--amber-soft:#222222}
+body{background:radial-gradient(ellipse at 85% 0,#18181866,transparent 55%),#050505}.side{background:#080808}.navitem.active{background:#242424;color:#fff}.navitem:hover{background:#1b1b1b}.main{background:transparent}.card{background:#101010}.btn.pri{background:linear-gradient(115deg,#f2f2f2,#d4d4d4);color:#080808;box-shadow:0 4px 20px #ffffff12}.btn.pri:hover{background:#fff}.btn.ghost{background:#252525;color:#eee;border:1px solid #353535}.pill,.stagebadge{border:1px solid #383838}.sev.critical,.sev.high,.sev.medium,.sev.low{background:#222;color:#ddd;border:1px solid #444}.sev.critical{background:#333;color:#fff;border-color:#777}.ficon{background:#222;color:#eee}.ficon.bad{background:#272727;color:#fff;border:1px solid #777}.flag{background:#202020;border-color:#555;color:#ddd}.blocked-inline{background:#202020;color:#eee;border-color:#666}.ldot{background:#aaa}.ldot.r{background:#fff;outline:1px solid #aaa;outline-offset:2px}.ldot.g,.ldot.v{background:#bcbcbc}.workflow .stage.active{background:linear-gradient(120deg,#323232,#191919);border-color:#aaa;color:#fff;box-shadow:0 0 22px #ffffff24,inset 0 0 16px #ffffff08}.workflow .stage.active em{background:#f2f2f2;color:#080808;box-shadow:0 0 14px #ffffff38}.workflow .stage.done{color:#aaa}.workflow .stage.done em{background:#242424;color:#ccc}.workflow .stage:not(:disabled):hover{border-color:#666}.workflow .stage-label{color:#bbb}.jump-current{background:#202020;color:#f0f0f0;border-color:#777}.speedctl{background:#1b1b1b;border-color:#454545}.speedctl button:hover{background:#333;color:#fff}.wtask{background:#1b1b1b;border-color:#383838}.bar{background:#292929}.bar i{background:#ccc}.info{color:#aaa;border-color:#555}.info:hover{color:#fff;border-color:#aaa}#tip{background:#242424;color:#ddd;border-color:#555}#tip b{color:#fff}.hero h1 span{color:#ccc}.face{border-color:#aaa8;background:linear-gradient(135deg,#454545ee,#121212ee);box-shadow:inset 0 0 40px #ffffff12}.face.top{background:linear-gradient(135deg,#aaa,#424242)}.inner-mark{border-color:#ddd;box-shadow:0 0 28px #ffffff22}.inner-mark:after{background:#ddd;box-shadow:0 0 20px #ffffff44}.core-label{background:linear-gradient(125deg,#252525ee,#111111ee);border-color:#5559;color:#eee}.core-label svg{color:#ddd}.core-label small{color:#aaa}.orbit{border-color:#7776}.dot3d,.dot3d.second{background:#ddd;box-shadow:0 0 16px #fff5}.core-scene::before{background:radial-gradient(ellipse,#ffffff18,transparent 65%)}.modal{background:linear-gradient(140deg,#222,#101010);border-color:#444}.ovl{background:#000c}.cert .cell{background:#151515}.cert .seal{color:#ddd}.cert .seal svg{color:#ddd}.stat{background:#161616}.tasksubtitle,.history-note{color:#aaa}
+.pdfBrief{margin-top:22px;padding-top:20px;border-top:1px solid var(--border)}.pdfBrief p{font-size:12px;line-height:1.7;color:var(--sub);margin-top:12px}.detail-head{flex-wrap:wrap}
+/* The issue header and rail stay outside the stage-panel scroll area. */
+#main.task-layout{display:flex!important;flex-direction:column;padding:0;overflow:hidden;min-height:0}
+.task-header{flex:none;padding:24px 30px 18px;background:#080808;border-bottom:1px solid #262626;z-index:4}.task-header .crumb{margin-bottom:10px}.task-header .mainhead{margin:0 0 10px}.task-header .tasksubtitle{margin:0;line-height:1.5}
+#main.task-layout .workflow{flex:1;min-height:0;margin:0;gap:0;align-items:stretch;grid-template-columns:210px minmax(0,1fr)}
+.task-layout .rail-panel{min-height:0;overflow:hidden;padding:20px 14px;background:#0a0a0a;border-right:1px solid #242424;display:flex;flex-direction:column;gap:18px}
+.task-layout .workflow .stagebar{position:static;padding:0;gap:7px;flex:none}.task-layout .workflow .stage{padding:12px 10px;font-size:12px;min-height:48px}
+.task-layout .workflow .grid{height:100%;overflow-y:auto;padding:24px 28px 94px;overscroll-behavior:contain;scroll-padding-top:20px}.task-layout .workflow .card{scroll-margin-top:0}
+.rail-meta{border-top:1px solid #303030;padding:17px 10px 0;color:#aaa;font-size:11px;line-height:1.7}.rail-meta .rail-label{font-size:9px;text-transform:uppercase;letter-spacing:1.2px;color:#888}.rail-meta .agent-name{display:block;color:#eee;font-size:14px;font-weight:600;margin:4px 0 10px}.rail-meta .expiry{border-top:1px solid #303030;padding-top:13px;margin-top:12px}.rail-meta .erow{display:block}.rail-meta .erow span{display:block;font-size:10px;color:#999}.rail-meta #cd{font-size:21px;color:#eee;letter-spacing:1px;display:block;margin:5px 0}.rail-meta .bar{height:3px}.rail-meta .rail-chain{font-size:10px;margin:10px 0 0}.task-layout .history-note{margin:0 0 20px}
+@media(max-width:1020px){.task-header{padding:20px 24px 16px}#main.task-layout .workflow{grid-template-columns:175px minmax(0,1fr)}.task-layout .workflow .grid{padding:22px 20px 100px}.task-layout .rail-panel{padding:18px 10px}}
+@media(max-width:650px){.task-header{padding:14px 16px 12px}.task-header .crumb{font-size:10px;margin-bottom:8px}.task-header .mainhead{gap:8px;margin-bottom:6px}.task-header .mainhead h1{font-size:18px;line-height:1.25}.task-header .pill{font-size:9px;padding:3px 7px}.task-header .tasksubtitle{font-size:10px;line-height:1.4}.task-header .tasksubtitle .impact{display:none}#main.task-layout .workflow{grid-template-columns:96px minmax(0,1fr)}.task-layout .rail-panel{padding:12px 7px;gap:12px}.task-layout .workflow .stagebar{gap:5px}.task-layout .workflow .stage{padding:8px 6px;font-size:9px;min-height:53px;gap:4px}.task-layout .workflow .stage em{width:22px;height:22px;font-size:10px}.task-layout .workflow .grid{padding:14px 10px 110px}.rail-meta{padding:12px 4px 0;font-size:9px;line-height:1.5}.rail-meta .agent-name{font-size:11px;margin:4px 0 8px;overflow-wrap:anywhere}.rail-meta .rail-label{font-size:8px;letter-spacing:.5px}.rail-meta .expiry{padding-top:10px;margin-top:10px}.rail-meta #cd{font-size:16px;letter-spacing:0}.rail-meta .erow span{font-size:8px}.rail-meta .rail-chain{font-size:8px;margin-top:8px}.task-layout .workflow .cbody{padding:13px}.task-layout .workflow .chead{padding:13px;font-size:11px}.task-layout .jump-current{right:12px;max-width:calc(100vw - 118px)}}
+@media(max-height:680px){.rail-meta .rail-chain{display:none}.task-layout .rail-panel{gap:8px}.task-layout .workflow .stage{padding-top:6px;padding-bottom:6px;min-height:40px}.rail-meta .expiry{margin-top:6px;padding-top:6px}.rail-meta .agent-name{margin-bottom:4px}}
+
+/* The header fills from white to black independently of the fixed layout. */
+.task-header{--header-front:-25%;background:linear-gradient(90deg,#080808 0%,#080808 calc(var(--header-front) - 18%),#888 var(--header-front),#fff calc(var(--header-front) + 18%),#fff 100%);isolation:isolate;border-bottom-color:#444}
+.task-header>.crumb,.task-header>.mainhead,.task-header>.tasksubtitle{mix-blend-mode:difference;color:#fff}
+.task-header .crumb,.task-header .back,.task-header h1,.task-header .tasksubtitle,.task-header .impact,.task-header #statusPill{color:#fff!important}
+.task-header #statusPill{background:transparent!important;border:1px solid #bbb;box-shadow:none}
+.task-header .back:hover{color:#ddd!important}
+.task-header h1,.task-header .back,.task-header .tasksubtitle,.task-header #statusPill{ -webkit-text-stroke:.3px #000;text-shadow:0 0 1px #000,0 1px 2px #000;}.task-header h1{-webkit-text-stroke:.5px #000}
+.task-header>.crumb,.task-header>.mainhead,.task-header>.tasksubtitle{mix-blend-mode:normal}
+.task-header .crumb,.task-header .back,.task-header h1,.task-header .tasksubtitle,.task-header #statusPill{color:transparent!important;-webkit-text-stroke:0;text-shadow:none;background-image:linear-gradient(90deg,#fff 0%,#fff var(--ink-split),#080808 var(--ink-split),#080808 100%)!important;background-size:var(--ink-width) 100%!important;background-position:var(--ink-offset) 0!important;background-repeat:no-repeat!important;background-clip:text!important;-webkit-background-clip:text!important}
+.task-header #statusPill{border-color:#888}.task-header .impact{color:inherit!important}
+
+.employee-sign{display:flex;gap:8px;margin:0 0 10px;max-width:440px;align-items:flex-end}.employee-sign label{flex:1;min-width:0;font-size:10px;color:#aaa;display:flex;flex-direction:column;gap:5px}.employee-sign select,.employee-sign input{box-sizing:border-box;width:100%;height:38px;border:1px solid #444;border-radius:7px;background:#171717;color:#fff;padding:0 10px;font:inherit;font-size:12px;min-width:0;color-scheme:dark}.employee-sign select:focus,.employee-sign input:focus{outline:1px solid #ddd;outline-offset:2px}.sign-error{font-size:11px;color:#eee;min-height:0;margin-bottom:8px}.demo-sign-note{color:#777;font-size:10px;margin:8px 0 12px}.review-actions .employee-sign{flex-basis:100%}#signoffPanel .cbody>#signoffBtn{width:100%;max-width:440px}
+</style></head><body>
+<div class="topbar">
+  <div class="brand"><div class="mk"></div>Black Box<span class="dot"></span></div>
+  <div class="topright" style="display:none">
+    <div class="envpill"><i></i>Simulation sandbox</div>
+    <div class="avatar">SH</div>
+  </div>
+</div>
+<div class="shell">
+  <aside class="side">
+    <button type="button" class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Overview</button>
+    <button type="button" class="navitem active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M4 10h-2M4 14h-2M22 10h-2M22 14h-2M10 4V2M14 4V2M10 22v-2M14 22v-2"/></svg>Agents</button>
+    <button type="button" class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>Records</button>
+    <button type="button" class="navitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Reviews</button>
+    <div class="secttl" style="display:none">Live agents</div>
+    <div style="display:none" class="agentrow live"><i></i>Demo agent<span style="margin-left:auto;font-size:11px;color:var(--vio)">ready</span></div>
+    <div style="display:none" class="agentrow"><i></i>SCOUT-3</div>
+    <div style="display:none" class="agentrow"><i></i>LEDGER-5</div>
+    <div class="sidefoot" style="display:none">Black Box / 03<br>Every action on record.<br>Every limit enforced.</div>
+  </aside>
+  <main class="main" id="main"></main><main class="main" id="pageMain" style="display:none"></main>
+</div>
+
+<div class="speedctl">
+  <button id="pauseBtn" title="Pause / resume">⏸</button>
+  <button id="slowBtn" title="Slower">−</button>
+  <span class="lbl" id="speedLbl">1.0×</span>
+  <button id="fastBtn" title="Faster">+</button>
+</div>
+
+<!-- denied modal -->
+<div class="ovl" id="deniedOvl"><div class="modal">
+  <span class="mtag" style="color:var(--red);background:var(--red-soft)">Warrant enforced</span><div class="dicon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg></div>
+  <h2>Action denied</h2>
+  <p>The agent proposed an action outside its task warrant. Black Box blocked the action and recorded the attempt.</p>
+  <div class="dreason"><span class="k">Block reason</span>External writes are prohibited by the active task warrant</div>
+  <div class="dnote"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>The attempt itself is now on the record - entry #07</div>
+</div></div>
+
+<!-- certificate modal -->
+<div class="ovl" id="certOvl"><div class="modal cert">
+  <div class="sealwrap"><svg width="92" height="92" viewBox="0 0 120 120">
+    <defs><path id="cir2" d="M60,60 m-45,0 a45,45 0 1,1 90,0 a45,45 0 1,1 -90,0"/></defs>
+    <circle cx="60" cy="60" r="56" fill="none" stroke="#b1b1b1" stroke-width="3"/>
+    <circle cx="60" cy="60" r="33" fill="#232323"/>
+    <path d="M46 60 l10 10 l20 -20" fill="none" stroke="#b1b1b1" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text font-family="Arial" font-size="10.5" font-weight="bold" fill="#b1b1b1" letter-spacing="2.5"><textPath href="#cir2">BLACK BOX · CERTIFIED RECORD ·</textPath></text>
+  </svg></div>
+  <h2>Record certified</h2>
+  <div class="csub">Demo review complete · human sign-off recorded</div>
+  <div class="cgrid">
+    <div class="cell"><div class="k">Record</div><div class="v">BB-2026-0930</div></div>
+    <div class="cell"><div class="k">Entries</div><div class="v">12</div></div>
+    <div class="cell"><div class="k">Record chain</div><div class="v g">SHA-256 · verified ✓</div></div>
+    <div class="cell"><div class="k">Blocked attempts</div><div class="v">1 · on record</div></div>
+  </div>
+  <div class="signed">Signed by <b id="sigName">Demo reviewer</b> · <span id="sigTime"></span></div>
+  <div class="tagline">The agent did the work. The record proves it.</div>
+  <button class="btn ghost" id="replayBtn" style="width:100%">Return to issues</button>
+</div></div>
+
+<div id="tip" role="dialog"></div><script>
+function sha256(ascii){function rr(v,a){return(v>>>a)|(v<<(32-a))}
+var mp=Math.pow,mw=mp(2,32),len=ascii.length,words=[],ab=len*8,hash=sha256.h=sha256.h||[],k=sha256.k=sha256.k||[],pc=k.length,ic={};
+for(var g=2;pc<64;g++){if(!ic[g]){for(var i=0;i<313;i+=g)ic[i]=g;hash[pc]=(mp(g,.5)*mw)|0;k[pc++]=(mp(g,1/3)*mw)|0}}
+ascii+='\x80';while(ascii.length%64-56)ascii+='\x00';
+for(var i=0;i<ascii.length;i++){var j=ascii.charCodeAt(i);words[i>>2]|=j<<((3-i)%4)*8}
+words[words.length]=(ab/mw)|0;words[words.length]=ab;
+for(var j=0;j<words.length;){var w=words.slice(j,j+=16),oldHash=hash;hash=hash.slice(0,8);
+for(var i=0;i<64;i++){var w15=w[i-15],w2=w[i-2],a=hash[0],e=hash[4];
+var t1=hash[7]+(rr(e,6)^rr(e,11)^rr(e,25))+((e&hash[5])^((~e)&hash[6]))+k[i]
++(w[i]=(i<16)?w[i]:(w[i-16]+(rr(w15,7)^rr(w15,18)^(w15>>>3))+w[i-7]+(rr(w2,17)^rr(w2,19)^(w2>>>10)))|0);
+var t2=(rr(a,2)^rr(a,13)^rr(a,22))+((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
+hash=[(t1+t2)|0].concat(hash);hash[4]=(hash[4]+t1)|0}
+for(var i=0;i<8;i++)hash[i]=(hash[i]+oldHash[i])|0}
+var out='';for(var i=0;i<8;i++)for(var j=3;j+1;j--){var b=(hash[i]>>(j*8))&255;out+=((b<16)?'0':'')+b.toString(16)}
+return out}
+
+
+const $=id=>document.getElementById(id);
+const IC={
+ doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
+ search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>',
+ branch:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v6M18 9c0 6-8 3-8 6"/></svg>',
+ clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>',
+ chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="20"/><rect x="6" y="12" width="3" height="8"/><rect x="11" y="8" width="3" height="12"/><rect x="16" y="4" width="3" height="16"/></svg>',
+ tool:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.7-3.7z"/></svg>',
+ image:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>',
+ refresh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2-9.4L23 10"/></svg>',
+ pulse:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+ check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
+ x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+ shield:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'};
+
+
+const ISSUES=[
+{id:'BB-1042',title:'Payment gateway is failing',service:'payment-service',severity:'Critical',impact:'Customers cannot complete checkout',metric:'12.4% failed payments',pattern:'connection pool exhausted',cause:'The last deployment raised the connection pool from 20 to 200, above the database limit of 100.',fix:'Restore the pool size to 20',result:'Failed payments dropped from 12.4% to 0.1%',health:'Checkout test passed · 41 ms'},
+{id:'BB-1043',title:'Sign-in requests are timing out',service:'auth-service',severity:'Critical',impact:'Users are locked out of their accounts',metric:'31% timed-out requests',pattern:'session lookup timeout',cause:'The session timeout was set to 50 ms instead of 5 seconds in the latest deployment.',fix:'Restore the session timeout to 5 seconds',result:'Sign-in timeouts dropped from 31% to 0.2%',health:'Sign-in test passed · 82 ms'},
+{id:'BB-1044',title:'Checkout inventory is out of sync',service:'inventory-service',severity:'High',impact:'Available products appear sold out',metric:'842 stale stock records',pattern:'inventory refresh delayed',cause:'The stock refresh interval changed from 30 seconds to 30 minutes.',fix:'Restore the refresh interval to 30 seconds',result:'Stale stock records dropped from 842 to 0',health:'Stock check passed · 63 ms'},
+{id:'BB-1045',title:'Order notifications are stuck',service:'notification-service',severity:'High',impact:'Customers are not receiving order updates',metric:'1,280 queued messages',pattern:'worker concurrency exhausted',cause:'The worker count was reduced from 8 to 1 during the latest release.',fix:'Restore the notification worker count to 8',result:'Queued messages dropped from 1,280 to 0',health:'Test notification delivered · 120 ms'},
+{id:'BB-1046',title:'Search results are loading slowly',service:'search-service',severity:'Medium',impact:'Product discovery takes longer than expected',metric:'2.8 second response time',pattern:'cache lookup bypassed',cause:'The latest configuration disabled the search cache.',fix:'Re-enable the search cache',result:'Search response time dropped from 2.8 seconds to 180 ms',health:'Search test passed · 180 ms'},
+
+];
+
+const INCIDENT_PROFILES=[
+{agent:'PAYOPS-7',scope:'Restore payment connection capacity without charging a customer or changing gateway credentials.',allowed:['Read redacted payment errors and deployment history','Restore payment DB pool size from 200 to 20','Restart payment workers after human approval','Run a sandbox authorization and connection test'],forbidden:['Live charges, refunds, or card-data access','Public uploads or gateway-secret access'],cause:'Deploy pay-2026.09.30.47 set DB_POOL_MAX=200 across 4 workers. The database allows 100 clients. PostgreSQL returned SQLSTATE 53300, leaving gateway authorization requests waiting until their 5-second timeout.',fix:'Set DB_POOL_MAX=20; roll payment workers in batches of two',pattern:'SQLSTATE 53300: too many clients',logs:'4,213 redacted requests · 523 authorization timeouts · 19:41–19:46 UTC',sample:'19:44:08Z POST /payments/authorize → 504 · request pay_b84c · DB wait 5,002 ms',deploy:'pay-2026.09.30.47 · pool 20 → 200 · first error 19 minutes later',prior:'PAY-218: pool saturation after scaling; the approved rollback restored capacity',metric:'12.4% failed payments',health:'Sandbox authorization approved · 41 ms · active DB clients 72/100',result:'Failed payments fell from 12.4% to 0.1% over 500 sandbox requests',blockedAction:'Exporting a payment diagnostic bundle',blockedDetail:'The agent tried to send redacted transaction traces to a public paste site.',blockedResource:'Public paste site',review:'Configuration rollback recovered authorization capacity. A public diagnostic export was denied; no payment data left the sandbox.',advisory:'Keep payment traces private. Sandbox success does not authorize live customer charges.',reviewer:'Payment operations reviewer'},
+{agent:'AUTHOPS-3',scope:'Restore session lookups without reading passwords or weakening authentication.',allowed:['Read redacted session latency and configuration','Restore SESSION_LOOKUP_TIMEOUT_MS to 5000','Restart auth workers after human approval','Test synthetic sign-in and session refresh'],forbidden:['Disabling MFA or bypassing access checks','Reading passwords, tokens, or cookie secrets'],cause:'Deploy auth-2026.09.30.32 changed SESSION_LOOKUP_TIMEOUT_MS from 5000 to 50. Redis p95 lookup latency was 84 ms, so healthy sessions were rejected with AUTH_SESSION_TIMEOUT.',fix:'Restore session lookup timeout to 5000 ms; roll auth workers',pattern:'AUTH_SESSION_TIMEOUT',logs:'6,800 synthetic sign-ins · 2,108 timeouts · 19:12–19:17 UTC',sample:'19:14:32Z GET /session/validate → 503 · trace auth_1f92 · Redis lookup 84 ms; timeout 50 ms',deploy:'auth-2026.09.30.32 · lookup timeout 5000 → 50 ms · Redis remains healthy',prior:'AUTH-091: unit-conversion error in session timeout; corrected without changing MFA',metric:'31% timed-out requests',health:'Synthetic sign-in passed · 82 ms · MFA challenge still enforced',result:'Session timeouts fell from 31% to 0.2% across 1,000 synthetic sign-ins',blockedAction:'Proposing an MFA bypass',blockedDetail:'The agent tried to disable MFA globally as a shortcut to restore sign-in.',blockedResource:'Global MFA policy',review:'Session latency recovered after the timeout correction. The global MFA bypass was denied; authentication controls remained enabled.',advisory:'Never trade authentication checks for availability. Continue synthetic MFA tests.',reviewer:'Identity operations reviewer'},
+{agent:'STOCKOPS-4',scope:'Refresh the stock view without changing sellable quantities or existing orders.',allowed:['Read cache freshness and warehouse sync logs','Restore stock refresh interval to 30 seconds','Restart inventory refresh workers after approval','Compare cached and warehouse counts read-only'],forbidden:['Changing warehouse counts or order quantities','Writing to the fulfillment service'],cause:'Deploy inv-2026.09.30.18 set STOCK_REFRESH_SECONDS=1800 instead of 30. Cached availability for 842 SKUs lagged warehouse updates by up to 28 minutes and returned INV_STALE_VIEW.',fix:'Restore stock refresh interval to 30 seconds; rebuild the read-only cache',pattern:'INV_STALE_VIEW',logs:'842 stale SKUs · 17 warehouse batches · cache age p95 28 minutes',sample:'18:58:11Z GET /stock/SKU-7421 → cached 0; warehouse 18 · cache age 1,684 s',deploy:'inv-2026.09.30.18 · refresh interval 30 → 1800 seconds',prior:'INV-063: stale availability after refresh delay; rebuilding cache preserved warehouse truth',metric:'842 stale stock records',health:'842 SKU comparisons passed · 63 ms · warehouse quantities unchanged',result:'Stale availability records fell from 842 to 0 after two refresh cycles',blockedAction:'Proposing a fulfillment override',blockedDetail:'The agent tried to overwrite fulfillment-service quantities to match the stale cache.',blockedResource:'fulfillment-service',review:'The refreshed cache matches warehouse counts. A cross-service quantity write was denied; no stock or orders were changed.',advisory:'Treat the warehouse as the stock authority. Cache repair must never alter real quantities.',reviewer:'Inventory operations reviewer'},
+{agent:'QUEUEOPS-2',scope:'Drain delayed order updates without sending duplicate messages or editing orders.',allowed:['Read queue depth, delivery receipts, and worker configuration','Restore notification worker count from 1 to 8','Restart notification workers after approval','Test synthetic delivery and verify idempotency keys'],forbidden:['Bypassing duplicate-message protection','Changing orders or customer contact information'],cause:'Deploy notify-2026.09.30.21 reduced WORKER_CONCURRENCY from 8 to 1. Incoming traffic reached 46 events/minute while the worker processed 12, leaving 1,280 order updates queued with QUEUE_LAG_HIGH.',fix:'Restore 8 notification workers; drain the queue using existing idempotency keys',pattern:'QUEUE_LAG_HIGH',logs:'1,280 queued events · oldest 38 minutes · receipt retries 0',sample:'19:06:48Z queue order-status · depth 1280 · rate in 46/min, out 12/min · key ord_8c71:shipped',deploy:'notify-2026.09.30.21 · concurrency 8 → 1 · queue started growing after release',prior:'NOTIFY-044: under-provisioned workers; scaling safely drained events without replay',metric:'1,280 queued messages',health:'Synthetic notification delivered · 120 ms · duplicate sends 0',result:'Queued updates fell from 1,280 to 0; p95 delay fell from 38 minutes to 2 seconds',blockedAction:'Proposing a duplicate-check bypass',blockedDetail:'The agent tried to turn off idempotency checks to drain the queue faster.',blockedResource:'Notification idempotency policy',review:'The queue drained at restored worker capacity. The duplicate-check bypass was denied; existing delivery keys stayed active.',advisory:'Keep delivery idempotency enabled during recovery. Queue speed is not worth duplicate updates.',reviewer:'Messaging operations reviewer'},
+{agent:'SEARCHOPS-5',scope:'Restore product-search latency without changing rankings, catalog data, or customer profiles.',allowed:['Read query latency, cache hits, and release configuration','Re-enable the product query cache','Restart search workers after human approval','Run synthetic queries and compare result IDs'],forbidden:['Exporting raw customer search histories','Changing rankings, catalog data, or profile stores'],cause:'Deploy search-2026.09.30.09 set QUERY_CACHE_ENABLED=false. Cache hit rate dropped from 94% to 0%, and Elasticsearch handled every request; search p95 rose to 2.8 seconds with SEARCH_BACKEND_SLOW.',fix:'Re-enable query cache with the existing 60-second TTL; warm popular synthetic queries',pattern:'SEARCH_BACKEND_SLOW',logs:'10,000 sampled queries · cache hit 0% · backend CPU 92%',sample:'18:43:17Z GET /search?q=running-shoes → 200 · 2,811 ms · cache BYPASS · shard wait 2,240 ms',deploy:'search-2026.09.30.09 · query cache enabled → disabled · no index changes',prior:'SEARCH-072: cache disabled during debugging; re-enable and compare unchanged result IDs',metric:'2.8 second response time',health:'Synthetic query passed · 180 ms · top 20 result IDs unchanged',result:'Search p95 fell from 2.8 seconds to 180 ms; cache hit rate recovered to 94%',blockedAction:'Exporting raw search histories',blockedDetail:'The agent tried to export customer query histories to an external tuning endpoint.',blockedResource:'External tuning endpoint',review:'Latency recovered with the query cache enabled. The customer-history export was denied; catalog and ranking data stayed unchanged.',advisory:'Tune with synthetic queries, not customer histories. Keep ranking changes outside this warrant.',reviewer:'Search operations reviewer'}
+];
+ISSUES.forEach((issue,n)=>Object.assign(issue,INCIDENT_PROFILES[n]));
+
+let selected=null, entries=[], prevHash='GENESIS', speed=1, paused=false, running=false, timer=null, expiry=0;
+const nowT=()=>new Date().toLocaleTimeString('en-GB',{hour12:false});
+const info=(key)=>`<button class="info" aria-label="Explain ${key}" data-info="${key}">i</button>`;
+const HELP={
+'Issues inbox':['Choose the problem','These are sample incidents, ranked by how urgently they affect people. Pick one to watch an agent investigate it, propose a repair, and account for its actions.'],
+'Warrant':['The agent permission slip','The warrant names the task, permitted actions, forbidden actions, and expiry time. Every attempted action goes through a separate rule check. Anything outside these limits is blocked.'],
+'Agent activity':['Watch the work happen','This feed tells you what the agent is looking at, what it found, and what it tries next. The agent and service data are simulated; the permission checks and record hashing run in this page.'],
+'Black Box record':['A record you can check','Every allowed action and blocked attempt gets a timestamp and a digital fingerprint linked to the previous entry. Changing a saved entry breaks that chain. This local demo is tamper-evident, not tamper-proof or an external proof of truth.'],
+'Internal Affairs':['A review before sign-off','This review checks the recorded actions, verifies the chain, and flags blocked attempts. It recommends a decision, but it cannot sign off. In this demo the review rules are deterministic.'],
+'Human sign-off':['The final decision is yours','A human must inspect the review and press the sign-off button. The resulting certificate records that demo decision. It is not a legal certificate or production authorization.'],
+'Pacing':['Your presentation controls','Pause while you explain a step, or slow down and speed up the sequence. These controls only affect the demo pace. The warrant expiry clock keeps real time.']};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-info]');const tip=$('tip');if(b){const [title,text]=HELP[b.dataset.info];tip.innerHTML=`<b>${title}</b>${text}`;tip.classList.add('show');const r=b.getBoundingClientRect();tip.style.left=Math.max(12,Math.min(r.left,innerWidth-312))+'px';tip.style.top=Math.max(12,Math.min(r.bottom+10,innerHeight-230))+'px';}else if(!e.target.closest('#tip'))tip.classList.remove('show');});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('tip').classList.remove('show')});
+function inbox(){document.querySelector('.agentrow.live span').textContent='ready';clearInterval(timer);running=false;paused=false;selected=null;$('certOvl').classList.remove('show');$('deniedOvl').classList.remove('show');$('pauseBtn').textContent='⏸';$('main').innerHTML=`
+<div class="crumb">Workspace / Incidents</div><div class="intro"><div><span class="eyebrow">Agent accountability, by design</span><h1>Issues inbox ${info('Issues inbox')}</h1><p>Pick a problem. Give the agent boundaries. Keep every action on record.</p></div><div class="protection"><b>${IC.shield} Protected autonomy</b>One task. One warrant. An accountable record.<br><span class="subtle">All incidents below are simulated demo data.</span></div></div>
+<div class="metrics"><div class="metric"><strong>05 <small>open</small></strong><label>Issues waiting for a repair</label></div><div class="metric"><strong style="color:var(--red)">02 <small>critical</small></strong><label>Customer-facing interruptions</label></div><div class="metric"><strong style="color:var(--vio)">100% <small>scoped</small></strong><label>Every repair runs under a warrant</label></div></div>
+<div class="card"><div class="listhead"><b>Needs attention</b><span>Highest severity first · select to investigate</span></div>${ISSUES.map((i,n)=>`<button class="issue" data-issue="${n}"><div><span class="sev ${i.severity.toLowerCase()}">${i.severity}</span></div><div><h3>${i.title}</h3><p>${i.id} · ${i.impact}</p></div><div class="service">${i.service}<br><span class="subtle">${i.metric}</span></div><div class="launch">Investigate ↗</div></button>`).join('')}</div><div style="margin-top:18px" class="subtle">Offline demonstration · no credentials · no external writes · simulated service changes</div>`;
+document.querySelectorAll('.issue').forEach(b=>b.onclick=()=>startIssue(Number(b.dataset.issue)));
+document.querySelector('.protection svg').style='width:14px;height:14px;vertical-align:-3px;margin-right:6px';}
+function workspace(i){$('main').innerHTML=`<div class="crumb"><button class="back" id="back">← Issues inbox</button> / ${i.id}</div><div class="mainhead"><h1>${i.title}</h1><span class="pill vio" id="statusPill">Investigating</span></div><div class="tasksubtitle">${i.service} · ${i.agent} · ${i.impact}</div><div class="stagebar">${['Warrant','Investigate','Enforce limits','Review','Sign off'].map((x,n)=>`<div class="stage" id="stage${n}"><em>0${n+1}</em>${x}</div>`).join('')}</div>
+<div class="grid"><div><div class="card"><div class="chead">${IC.pulse}Agent activity ${info('Agent activity')}<span class="right pill vio" id="livePill">Live</span></div><div class="cbody"><div class="feed" id="feed"><div class="empty">Issuing a task-scoped warrant…</div></div></div></div>
+<div class="card" id="iaCard"><div class="chead">${IC.shield}Internal Affairs ${info('Internal Affairs')}<span class="right pill vio">Review ready</span></div><div class="cbody"><div class="stats"><div class="stat"><div class="k">Entries</div><div class="v" id="iaEntries"></div></div><div class="stat"><div class="k">Chain</div><div class="v g" id="iaChain"></div></div><div class="stat"><div class="k">Allowed</div><div class="v g" id="iaAllowed"></div></div><div class="stat"><div class="k">Blocked</div><div class="v r">1</div></div></div><div class="flag">${IC.shield}<div><b>Flagged · entry #07.</b> ${i.blockedDetail} No prohibited action occurred.</div></div><div class="recrow"><span class="lbl">Recommendation</span><span class="pill vio">Approve with advisory</span>${info('Human sign-off')}</div><button class="btn pri" id="signoffBtn">Sign off as human reviewer</button></div></div></div>
+<div><div class="card"><div class="chead">${IC.shield}Warrant ${info('Warrant')}<span class="right pill grn">Active</span></div><div class="cbody" id="warrantBody"></div></div><div class="card" style="margin-top:16px"><div class="chead">${IC.doc}Black Box record ${info('Black Box record')}<span class="right pill vio" id="recordPill">Recording</span></div><div class="cbody"><div class="log" id="log"></div></div></div></div></div>`;
+$('back').onclick=()=>{if(!running||confirm('Stop this demo run and return to the issues inbox?')){runId++;inbox()}};
+$('signoffBtn').onclick=signOff;
+$('warrantBody').innerHTML=`<div class="wtask"><b>${i.agent}</b> may repair <b>${i.service}</b> for ${i.id}. ${i.scope}</div><div class="wlbl">Permitted · selected service only</div>${i.allowed.map(t=>`<div class="wrow">${IC.check}<span>${t}</span></div>`).join('')}<div class="wlbl">Never permitted</div>${i.forbidden.map(t=>`<div class="wrow">${IC.x}<span>${t}</span></div>`).join('')}<div class="expiry"><div class="erow"><span>Warrant expires in</span><b id="cd">15:00</b></div><div class="bar"><i id="cdbar" style="width:100%"></i></div></div>`;
+expiry=Date.now()+900000;timer=setInterval(()=>{const sec=Math.max(0,Math.ceil((expiry-Date.now())/1000));if($('cd')){$('cd').textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');$('cdbar').style.width=sec/9+'%'}},1000);stage(0);}
+function stage(n){for(let j=0;j<5;j++)$('stage'+j).className='stage '+(j<n?'done':j===n?'active':'');const flow=document.querySelector('.workflow');if(flow)flow.dataset.stage=n;}
+function hashText(str){return sha256(unescape(encodeURIComponent(str)))}
+function logEntry(action,detail,kind,meta={}){const e={number:entries.length,timestamp:nowT(),action,detail,kind,...meta};e.previous=prevHash;e.hash=hashText(prevHash+'|'+JSON.stringify(e));entries.push(e);prevHash=e.hash;const d=document.createElement('div');d.className='lrow';d.title=e.hash;d.innerHTML=`<span class="ldot ${kind}"></span><div class="lact">${action}<span class="sub">${detail}</span></div><span class="ltime">${e.timestamp}</span><span class="lchk">↗</span>`;$('log').appendChild(d);$('log').scrollTop=$('log').scrollHeight;return e}
+function verifyChain(){let p='GENESIS';for(const e of entries){const {hash,...data}=e;if(data.previous!==p||hashText(p+'|'+JSON.stringify(data))!==hash)return false;p=hash}return true}
+function checkAction(tool,resource,approved=false){if(Date.now()>=expiry)return {allowed:false,reason:'Warrant expired'};if(resource!==selected.service)return {allowed:false,reason:'Outside the selected service'};if(!['read','edit','restart','health'].includes(tool))return {allowed:false,reason:'Action is not permitted by this task warrant'};if(tool==='restart'&&!approved)return {allowed:false,reason:'Human approval required'};return {allowed:true,reason:'Within warrant scope'}}
+function feedItem(icon,act){const target=document.querySelector('.workflow')?.dataset.stage==='2'?$('enforceFeed'):$('feed');if(target.querySelector('.empty'))target.innerHTML='';const d=document.createElement('div');d.className='fitem';d.innerHTML=`<div class="ficon">${IC[icon]}</div><div class="fbody"><div class="fact">${act} <span class="spin"></span></div><div class="fres"></div></div><div class="ftime">${nowT()}</div>`;target.appendChild(d);target.scrollTop=target.scrollHeight;return d}
+function feedDone(d,res,bad=false){d.querySelector('.spin')?.remove();d.querySelector('.fres').innerHTML=res;if(bad)d.querySelector('.ficon').className='ficon bad';const parent=d.parentElement;parent.scrollTop=parent.scrollHeight;}
+let runId=0;
+async function sleep(ms,id=runId){let done=0;while(done<ms){if(id!==runId)throw new Error('Run cancelled');await new Promise(r=>setTimeout(r,80));if(!paused)done+=80*speed}}
+function beats(i){return [
+['doc','Reading service logs',i.logs,'Read service logs','read'],
+['search','Looking for a pattern',i.sample,'Scanned error patterns','read'],
+['branch','Checking recent deployments',i.deploy,'Reviewed deployment history','read'],
+['clock','Reviewing previous incidents',i.prior,'Compared past incidents','read'],
+['chart','Connecting the evidence',i.cause,'Identified likely cause','read'],
+['tool','Preparing the repair',i.fix,'Staged configuration repair','edit'],
+['shield',i.blockedAction,i.blockedDetail,i.blockedAction,'upload'],
+['refresh','Preparing to restart the service','The repair is ready. Waiting for human approval.','Restarted selected service','restart'],
+['pulse','Checking the service',i.health,'Ran health checks','health'],
+['chart','Verifying recovery',i.result,'Verified recovery','health']];}
+async function startIssue(n,preview=null){navigate('Agents');runId++;const id=runId;selected=ISSUES[n];entries=[];prevHash='GENESIS';paused=false;running=true;workspace(selected);logEntry('Warrant issued',selected.id+' · task scope locked','v');document.querySelector('.agentrow.live span').textContent='on task';
+if(preview){previewRun(preview);return}
+try{await sleep(6000,id);stage(1);for(let index=0;index<10;index++){const b=beats(selected)[index];if(index===8){$('enforceStatus').textContent='Repair approved';}if(index===6){stage(2);$('enforceFeed').innerHTML='';}const d=feedItem(b[0],b[1]);await sleep(3500,id);feedDone(d,b[2]);
+if(b[4]==='upload'){await sleep(3000,id);const verdict=checkAction('upload',selected.service);logEntry('Denied: '+selected.blockedAction,selected.blockedResource+' · '+verdict.reason+' · no change made','r');feedDone(d,'Denied. '+selected.blockedDetail+' No prohibited action occurred.',true);$('blockedInline').hidden=false;await sleep(5500,id);}
+else{let approved=false;if(b[4]==='restart'){await approvalGate(id);approved=true;feedDone(d,'Human approved. Selected service restarted with corrected configuration.')}const verdict=checkAction(b[4],selected.service,approved);logEntry(b[3],verdict.reason,verdict.allowed?'g':'r',{tool:b[4],service:selected.service});}
+await sleep(3000,id);}
+finishRun();}catch(e){if(e.message!=='Run cancelled'){console.error(e);running=false}}}
+function approvalGate(id){return new Promise(resolve=>{const d=feedItem('shield','Human approval required');feedDone(d,'Restarting a service can affect active users. <button class="btn ghost" id="approveRestart" style="margin-top:8px">Approve this repair</button>');$('approveRestart').onclick=()=>{if(id!==runId)return;logEntry('Repair approved','Human approved the selected-service restart','v');$('approveRestart').disabled=true;$('approveRestart').textContent='Approved';resolve()}})}
+function finishRun(){logEntry('Task complete','Local record sealed for review','v');running=false;stage(3);$('statusPill').className='pill grn';$('statusPill').textContent='Resolved';$('livePill').style.display='none';const valid=verifyChain();$('recordPill').textContent=valid?'Chain verified':'Chain mismatch';$('recordPill').className='pill '+(valid?'grn':'red');$('iaCard').querySelector('.recrow').insertAdjacentHTML('afterend','<p class="stageNote" style="margin-top:16px">'+esc(selected.review)+' '+esc(selected.advisory)+'</p>');$('iaEntries').textContent=entries.length;$('iaChain').textContent=valid?'Verified ✓':'Broken';$('iaAllowed').textContent=entries.filter(e=>e.kind==='g').length;$('signoffBtn').disabled=!valid;saveSession(false);$('iaCard').classList.add('show');document.querySelector('.agentrow.live span').textContent='review';const thisRun=runId;sleep(5500,thisRun).then(()=>{if(thisRun===runId&&document.querySelector('.workflow'))stage(4)}).catch(()=>{});}
+function signOff(){if(!verifyChain()||$('certOvl').classList.contains('show')||entries.at(-1)?.action==='Human sign-off')return;logEntry('Human sign-off',selected.reviewer+' accepted: '+selected.advisory,'v');stage(4);$('sigTime').textContent=nowT();document.querySelector('.signed b').textContent=selected.reviewer;document.querySelectorAll('.cgrid .v')[0].textContent=selected.id;document.querySelectorAll('.cgrid .v')[1].textContent=entries.length;document.querySelector('.cgrid .v.g').textContent=verifyChain()?'SHA-256 · verified ✓':'Chain mismatch';$('certOvl').classList.add('show');$('signoffBtn').disabled=true;saveSession(true);}
+function previewRun(state){let count=state==='mid'?5:state==='denied'?7:10;const bs=beats(selected);for(let j=0;j<count;j++){if(j===6)stage(2);const b=bs[j],d=feedItem(b[0],b[1]);feedDone(d,b[2],j===6);if(j===7){feedDone(d,'Human approved. Selected service restarted with corrected configuration.');logEntry('Repair approved','Human approved the service restart','v');}logEntry(j===6?'Denied: '+selected.blockedAction:b[3],j===6?selected.blockedDetail:'Within warrant scope',j===6?'r':'g');}if(state==='denied'){$('deniedOvl').classList.add('show');stage(2)}else if(state==='review'||state==='cert'){finishRun();if(state==='cert')signOff()}else stage(1)}
+$('pauseBtn').onclick=()=>{paused=!paused;$('pauseBtn').textContent=paused?'▶':'⏸'};function setSpeed(v){speed=Math.min(2,Math.max(.5,Math.round(v*10)/10));$('speedLbl').textContent=speed.toFixed(1)+'×'};$('slowBtn').onclick=()=>setSpeed(speed/1.4);$('fastBtn').onclick=()=>setSpeed(speed*1.4);$('replayBtn').onclick=()=>{runId++;inbox();navigate('Agents')};document.querySelector('.speedctl').insertAdjacentHTML('beforeend',info('Pacing'));
+inbox();
+const params=new URLSearchParams(location.search);
+window.BBTest={verifyChain,checkAction,getEntries:()=>entries,getSelected:()=>selected};
+
+// Functional workspace pages and session records, stored on this device only.
+let activePage='Overview',sessionId=null;
+let sessions=[];try{sessions=JSON.parse(localStorage.getItem('blackbox-demo-records-v4')||'[]')}catch{}
+sessions.forEach(x=>{if(x.issue&&!x.issue.blockedDetail)x.issue={...x.issue,blockedAction:'Public diagnostic upload',blockedDetail:'The agent tried to send an internal screenshot to a public repository.',review:'This earlier demo session recorded a blocked public upload. Its original evidence is unchanged.',advisory:'Keep internal diagnostics private and inspect the original record.',reviewer:'Demo reviewer'}});
+const navButtons=[...document.querySelectorAll('.navitem')];
+navButtons.forEach((b,n)=>b.onclick=()=>navigate(['Overview','Agents','Records','Reviews'][n]));
+function saveSession(signed){if(!selected||!entries.length)return;if(!sessionId)sessionId=selected.id+'-'+Date.now();const session={id:sessionId,issue:{...selected},entries:JSON.parse(JSON.stringify(entries)),signed:signed||false,ended:new Date().toLocaleString('en-GB'),signedAt:signed?nowT():null,signedBy:signed?selected.reviewer:null};const idx=sessions.findIndex(x=>x.id===sessionId);if(idx<0)sessions.unshift(session);else{if(sessions[idx].signed&&!signed){session.signed=true;session.signedAt=sessions[idx].signedAt;session.signedBy=sessions[idx].signedBy}sessions[idx]=session}sessions=sessions.slice(0,20);try{localStorage.setItem('blackbox-demo-records-v4',JSON.stringify(sessions))}catch{}if(activePage==='Records')recordsPage();if(activePage==='Reviews')reviewsPage();}
+function verifySaved(list){let previous='GENESIS';for(const entry of list){const {hash,...data}=entry;if(data.previous!==previous||hashText(previous+'|'+JSON.stringify(data))!==hash)return false;previous=hash}return true}
+const esc=value=>String(value??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
+function navigate(page){activePage=page;navButtons.forEach((b,n)=>{b.classList.toggle('active',['Overview','Agents','Records','Reviews'][n]===page);b.setAttribute('aria-current',b.classList.contains('active')?'page':'false')});$('main').style.display=page==='Agents'?'block':'none';$('pageMain').style.display=page==='Agents'?'none':'block';document.querySelector('.speedctl').classList.toggle('hidden',page!=='Agents');$('tip').classList.remove('show');if(page==='Overview')overviewPage();if(page==='Records')recordsPage();if(page==='Reviews')reviewsPage();$('pageMain').scrollTop=0;}
+function overviewPage(){$('pageMain').innerHTML=`<section class="hero"><h1>AI agents do the work.<br><span>Black Box keeps them accountable.</span></h1><div class="core-scene" aria-label="A three-dimensional black box connected to permission, record, and human review"><div class="orbit"><i class="dot3d"></i><i class="dot3d second"></i></div><div class="orbit two"></div><div class="core-space"><div class="cube3d"><div class="face front"><span class="inner-mark"></span></div><div class="face back"></div><div class="face left"></div><div class="face right"></div><div class="face top"></div><div class="face bottom"></div></div></div><div class="core-label a">${IC.shield}<div>Set the limits<small>A permission slip for each task</small></div></div><div class="core-label b">${IC.doc}<div>Record every action<small>Even the ones that get blocked</small></div></div><div class="core-label c">${IC.check}<div>A human decides<small>Review, then sign off</small></div></div></div></section>`;setupHeroInteraction();}
+function emptyPage(name,icon,title,text){return `<div class="pagehead"><div><h1>${name}</h1></div></div><div class="card page-empty"><div class="symbol">${IC[icon]}</div><h2>${title}</h2><p>${text}</p><button class="btn pri" onclick="navigate('Agents')">Choose an issue</button></div>`}
+function recordsPage(){$('pageMain').innerHTML=sessions.length?`<div class="pagehead"><div><h1>Records ${info('Black Box record')}</h1><p>What the agent did. What was blocked. Who approved it.</p></div><span class="pill gry">${sessions.length} saved on this device</span></div><div class="card">${sessions.map((x,n)=>`<div class="session-row"><div class="name"><h3>${esc(x.issue.title)}</h3><p>${esc(x.issue.id)} · ${esc(x.ended)}<br>${x.entries.length} entries · ${x.entries.filter(e=>e.kind==='r').length} blocked attempt</p></div><span class="pill ${verifySaved(x.entries)?'grn':'red'}">${verifySaved(x.entries)?'Chain verified':'Chain mismatch'}</span><button class="btn ghost" onclick="openRecord(${n})">Inspect record</button></div>`).join('')}</div><div id="recordDetail"></div><div class="tone-note">Demo evidence is saved in this browser. Hashes detect changes to this record, but are not an external or tamper-proof archive.</div>`:emptyPage('Records','doc','No records yet','Complete an issue repair in Agents. Its actions, blocked attempts, and human approvals will appear here.');}
+function openRecord(n){const x=sessions[n];$('recordDetail').innerHTML=`<div class="card recordDetail"><div class="detail-head"><strong>${esc(x.issue.id)} · Evidence trail</strong><span class="pill ${verifySaved(x.entries)?'grn':'red'}">${verifySaved(x.entries)?'Verified':'Mismatch'}</span><button class="btn ghost" onclick="downloadRecord(${n})">Download JSON</button></div><div class="evidence">${x.entries.map(e=>`<div class="e-row"><div class="e-title"><span class="ldot ${e.kind}"></span><b>#${String(e.number).padStart(2,'0')}</b><span>${esc(e.action)}</span><span style="margin-left:auto;color:var(--faint)">${esc(e.timestamp)}</span></div><small>${esc(e.detail)}</small><span class="fingerprint">SHA-256 ${esc(e.hash)}</span></div>`).join('')}</div></div>`;$('recordDetail').scrollIntoView({behavior:'smooth',block:'start'})}
+function downloadRecord(n){const x=sessions[n],blob=new Blob([JSON.stringify(x,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=x.issue.id+'-record.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function reviewsPage(){$('pageMain').innerHTML=sessions.length?`<div class="pagehead"><div><h1>Reviews ${info('Internal Affairs')}</h1><p>The agent finishes the task. A human makes the final call.</p></div></div><div class="card">${sessions.map((x,n)=>`<div class="session-row"><div class="name"><h3>${esc(x.issue.title)}</h3><p>${esc(x.issue.id)} · ${esc(x.ended)}</p></div><span class="pill ${x.signed?'grn':'vio'}">${x.signed?'Signed off':'Needs your review'}</span><button class="btn ghost" onclick="openReview(${n})">${x.signed?'View decision':'Review now'}</button></div>`).join('')}</div><div id="reviewDetail"></div>`:emptyPage('Reviews','shield','Nothing waiting for review','When an agent finishes a repair, Internal Affairs checks the record and flags concerns here. A human must sign off.');}
+function openReview(n){const x=sessions[n],verified=verifySaved(x.entries);$('reviewDetail').innerHTML=`<div class="card recordDetail review-pane"><h2>${esc(x.issue.title)}</h2><p>${esc(x.issue.result)}</p><div class="review-meta"><span class="pill ${verified?'grn':'red'}">${verified?'Record chain verified':'Record mismatch'}</span><span class="pill gry">${x.entries.length} recorded events</span><span class="pill red">1 blocked attempt</span></div><div class="flag">${IC.shield}<div><b>${esc(x.issue.blockedAction)} blocked.</b> ${esc(x.issue.blockedDetail)} No prohibited action occurred.</div></div><p><b style="color:var(--text)">Recommendation: approve with advisory.</b><br>${esc(x.issue.review)} ${esc(x.issue.advisory)}</p><div class="review-actions">${x.signed?`<span class="pill grn">Signed off by ${esc(x.signedBy||x.issue.reviewer)} · ${esc(x.signedAt)}</span>`:`${employeeSignForm('saved-'+n)}<button class="btn pri" ${verified?'':'disabled'} onclick="approveSaved(${n})">Sign off</button>`}<button class="btn ghost" onclick="navigate('Records');openRecord(${n})">Inspect evidence</button></div><div class="tone-note">This is a simulated task review, not production authorization. ${info('Human sign-off')}</div></div>`;$('reviewDetail').scrollIntoView({behavior:'smooth',block:'start'});}
+function approveSaved(n){const x=sessions[n];if(x.signed||!verifySaved(x.entries))return;const employee=checkEmployeeSign('saved-'+n);if(!employee)return;x.issue.reviewer=employee;x.signedBy=employee;const last=x.entries.at(-1).hash;const e={number:x.entries.length,timestamp:nowT(),action:'Human sign-off',detail:x.issue.reviewer+' accepted: '+x.issue.advisory,kind:'v',previous:last};e.hash=hashText(last+'|'+JSON.stringify(e));x.entries.push(e);x.signed=true;x.signedAt=nowT();try{localStorage.setItem('blackbox-demo-records-v4',JSON.stringify(sessions))}catch{}if(sessionId===x.id){entries=JSON.parse(JSON.stringify(x.entries));prevHash=e.hash;if($('signoffBtn'))$('signoffBtn').disabled=true}reviewsPage();openReview(n);}
+// Reset per-run id without changing the selected issue flow.
+const originalWorkspace=workspace;workspace=function(issue){clearInterval(timer);sessionId=null;originalWorkspace(issue)};
+HELP['Overview']=['Accountability in one picture','The box represents the controls around an AI agent: task-specific limits, an action record, and a human decision. The graphic is built in and works offline.'];
+const pageQuery=new URLSearchParams(location.search).get('page');navigate(pageQuery||'Overview');
+// Preview states are kept for inspection only; ordinary launch always opens Overview.
+if(params.has('preview'))startIssue(Number(params.get('issue')||0),params.get('preview'));if(pageQuery)navigate(pageQuery);if(params.get('info'))setTimeout(()=>document.querySelector('[data-info="'+params.get('info')+'"]').click(),300);
+
+function setupHeroInteraction(){
+ const hero=document.querySelector('.hero'),scene=hero?.querySelector('.core-scene');if(!scene)return;
+ const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ let targetX=0,targetY=0,currentX=0,currentY=0,frame=0;
+ function draw(){
+  if(!scene.isConnected){frame=0;return}
+  currentX+=(targetX-currentX)*.12;currentY+=(targetY-currentY)*.12;
+  scene.style.setProperty('--core-x',(currentX*9).toFixed(3)+'px');
+  scene.style.setProperty('--core-y',(currentY*6).toFixed(3)+'px');
+  scene.style.setProperty('--core-rx',(-currentY*5).toFixed(3)+'deg');
+  scene.style.setProperty('--core-ry',(currentX*7).toFixed(3)+'deg');
+  scene.style.setProperty('--core-label-x',(currentX*-4).toFixed(3)+'px');
+  scene.style.setProperty('--core-label-y',(currentY*-3).toFixed(3)+'px');
+  if(Math.abs(targetX-currentX)+Math.abs(targetY-currentY)>.001)frame=requestAnimationFrame(draw);else frame=0;
+ }
+ function aim(x,y){if(reduced)return;const rect=hero.getBoundingClientRect();targetX=Math.max(-1,Math.min(1,(x-rect.left)/rect.width*2-1));targetY=Math.max(-1,Math.min(1,(y-rect.top)/rect.height*2-1));if(!frame)frame=requestAnimationFrame(draw)}
+ function reset(){targetX=0;targetY=0;if(!frame&&!reduced)frame=requestAnimationFrame(draw)}
+ hero.addEventListener('pointermove',e=>aim(e.clientX,e.clientY),{passive:true});
+ hero.addEventListener('pointerdown',e=>{if(e.pointerType==='touch')aim(e.clientX,e.clientY)},{passive:true});
+ hero.addEventListener('pointerleave',reset);hero.addEventListener('pointercancel',reset);
+ hero.addEventListener('pointerup',e=>{if(e.pointerType==='touch')reset()},{passive:true});
+ // Touch events also cover older mobile browsers without Pointer Events.
+ if(!window.PointerEvent){scene.addEventListener('touchmove',e=>{if(e.touches[0])aim(e.touches[0].clientX,e.touches[0].clientY)},{passive:true});scene.addEventListener('touchend',reset,{passive:true})}
+}
+
+const v6Workspace=workspace;
+workspace=function(issue){
+ v6Workspace(issue);
+ const rail=document.querySelector('.stagebar'),grid=document.querySelector('.grid');
+ const flow=document.createElement('div');flow.className='workflow';flow.dataset.stage='0';
+ rail.before(flow);flow.appendChild(rail);flow.appendChild(grid);
+ for(let j=0;j<5;j++)$('stage'+j).querySelector('em').textContent=j+1;
+ const feedPanel=$('feed').closest('.card');feedPanel.id='activityPanel';
+ const warrantPanel=$('warrantBody').closest('.card');warrantPanel.id='warrantPanel';
+ const recordPanel=$('log').closest('.card');recordPanel.id='recordPanel';
+ feedPanel.querySelector('.cbody').insertAdjacentHTML('afterbegin','<p class="stageNote">The agent gathers evidence and works out what caused the issue.</p>');
+ warrantPanel.querySelector('.cbody').insertAdjacentHTML('afterbegin','<p class="stageNote">First, give the agent a permission slip. Allowed actions are listed below; everything else stays out of reach.</p>');
+ const enforcement=document.createElement('section');enforcement.className='card';enforcement.id='enforcePanel';
+ enforcement.innerHTML=`<div class="chead">${IC.shield}Enforce limits ${info('Warrant')}<span class="right stagebadge" id="enforceStatus">Limits active</span></div><div class="cbody"><p class="stageNote">The agent may suggest an action. Black Box decides whether it is allowed. Risky repairs wait for your approval.</p><div class="wtask"><b>${issue.agent}</b> · ${issue.scope}<br>Never permitted: ${issue.forbidden.join("; ")}.</div><div class="feed" id="enforceFeed"><div class="empty">Checking the agent's next action…</div></div></div>`;
+ grid.appendChild(enforcement);
+ const signed=document.createElement('section');signed.className='card';signed.id='signoffPanel';
+ signed.innerHTML=`<div class="chead">${IC.check}Human sign-off ${info('Human sign-off')}</div><div class="cbody"><div class="stageCopy"><b>${issue.service} recovered. You make the final decision.</b><br>${issue.result}. ${issue.advisory} Inspect the record, then sign off when you are ready.</div><button class="btn ghost" onclick="navigate('Records')">Open Records</button> <button class="btn ghost" onclick="runId++;inbox();navigate('Agents')">Choose another issue</button></div>`;
+ grid.appendChild(signed);const decision=$('signoffBtn');signed.querySelector('.cbody').prepend(decision);decision.style.marginBottom='14px';
+ stage(0);
+};
+// Update inspection fixtures after wrapping the workspace. Ordinary startup remains Overview.
+if(params.has('preview')){runId++;inbox();startIssue(Number(params.get('issue')||0),params.get('preview'));if(pageQuery)navigate(pageQuery);}
+
+const V7_PANELS=['warrantPanel','activityPanel','enforcePanel','iaCard','signoffPanel'];
+const v7StageBase=stage;
+stage=function(n){
+ v7StageBase(n);const flow=document.querySelector('.workflow');if(!flow)return;
+ for(let j=0;j<5;j++){
+  const panel=$(V7_PANELS[j]),button=$('stage'+j);if(!panel)continue;
+  if(j<=n)panel.classList.add('revealed');
+  button.disabled=!panel.classList.contains('revealed');
+  if(j===n)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');
+ }
+ updateJump();
+};
+function jumpToStage(n){const p=$(V7_PANELS[n]);if(p?.classList.contains('revealed'))p.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});}
+function updateJump(){const chip=$('jumpCurrent'),flow=document.querySelector('.workflow');if(!chip||!flow)return;const n=Number(flow.dataset.stage),p=$(V7_PANELS[n]);const r=p.getBoundingClientRect(),m=$('main').getBoundingClientRect();chip.hidden=activePage!=='Agents'||(r.top>=m.top-20&&r.top<m.bottom-120);chip.textContent='Jump to '+(n+1)+' · '+['Warrant','Investigate','Enforce limits','Review','Sign off'][n]+' ↓';}
+const v7Workspace=workspace;
+workspace=function(issue){
+ v7Workspace(issue);
+ const grid=document.querySelector('.workflow .grid');
+ for(let j=0;j<5;j++){
+  const panel=$(V7_PANELS[j]);grid.appendChild(panel);
+  panel.querySelector('.chead').insertAdjacentHTML('afterbegin','<span class="stage-label">'+(j+1)+' / 5</span>');
+  const old=$('stage'+j),b=document.createElement('button');b.innerHTML=old.innerHTML;b.id=old.id;b.className=old.className;b.type='button';b.setAttribute('aria-label','Scroll to stage '+(j+1)+': '+old.textContent.replace(/^\d+/,''));old.replaceWith(b);b.onclick=()=>jumpToStage(j);
+ }
+ $('warrantPanel').before(Object.assign(document.createElement('p'),{className:'history-note',textContent:'Simulated incident evidence. Each stage stays here as the run continues. Scroll back to read, or use a stage number to jump. New activity never moves your reading position.'}));
+ $('enforceFeed').after(Object.assign(document.createElement('div'),{id:'blockedInline',className:'blocked-inline',hidden:true,textContent:issue.blockedDetail+' Blocked by the warrant and recorded for review. No prohibited action occurred.'}));
+ const chip=document.createElement('button');chip.id='jumpCurrent';chip.className='jump-current';chip.type='button';chip.hidden=true;chip.onclick=()=>jumpToStage(Number(document.querySelector('.workflow').dataset.stage));$('main').appendChild(chip);
+ $('main').scrollTop=0;stage(0);
+};
+$('main').addEventListener('scroll',updateJump,{passive:true});window.addEventListener('resize',updateJump);
+const v7Navigate=navigate;navigate=function(page){v7Navigate(page);updateJump()};
+if(params.has('preview')){runId++;inbox();startIssue(Number(params.get('issue')||0),params.get('preview'));if(pageQuery)navigate(pageQuery);}
+// Local PDF writer using standard PDF fonts. No library, key, service, or network.
+const BRIEF_COPY={
+'BB-1042':{cause:'A release let the payment workers request more database connections than the database could handle. Payments waited too long and failed.',fix:'The connection limit was restored to a safe level, then payment workers were restarted in small batches.',outcome:'In the simulation, failed payments fell from 12.4% to 0.1% over 500 test requests.',limits:['Read payment errors with sensitive details removed.','Restore the safe connection limit.','Restart payment workers only after human approval.','Test payment authorization without charging real customers.'],never:['Charge or refund a real customer.','Read card data or payment secrets.','Send payment diagnostics to a public site.'],blocked:'The agent proposed sending transaction diagnostics to a public paste site. Black Box rejected it. No payment data was sent.',advice:'Keep payment diagnostics private. Passing test payments does not give permission to charge real customers.'},
+'BB-1043':{cause:'A release shortened the wait for session checks to 50 milliseconds. Normal checks took longer, so people could not sign in.',fix:'The session wait limit was restored to five seconds and the sign-in workers were restarted.',outcome:'In the simulation, sign-in timeouts fell from 31% to 0.2% over 1,000 test sign-ins.',limits:['Read sign-in timing and settings without private credentials.','Restore the session wait limit.','Restart sign-in workers only after human approval.','Test sign-in and session renewal with test accounts.'],never:['Turn off multi-factor authentication.','Read passwords, access tokens, or private cookies.'],blocked:'The agent proposed turning off multi-factor authentication for everyone. Black Box rejected it. The extra security check stayed on.',advice:'Fix availability without weakening sign-in security. Keep testing the extra security challenge.'},
+'BB-1044':{cause:'A release changed stock refreshes from every 30 seconds to every 30 minutes. The shop showed old stock levels, making available products look sold out.',fix:'The refresh interval was restored to 30 seconds and the shop stock view was rebuilt from warehouse records.',outcome:'In the simulation, outdated stock views fell from 842 to zero after two refreshes. Warehouse quantities were unchanged.',limits:['Read stock-view freshness and warehouse update logs.','Restore the 30-second refresh interval.','Restart stock refresh workers only after human approval.','Compare the shop view with warehouse counts without changing them.'],never:['Change real warehouse counts or order quantities.','Write changes to the fulfillment service.'],blocked:'The agent proposed changing fulfillment quantities to match the outdated shop view. Black Box rejected it. No stock or orders were changed.',advice:'Warehouse records remain the source of truth. Repairing a shop view must not change real stock.'},
+'BB-1045':{cause:'A release reduced notification workers from eight to one. New order updates arrived faster than the worker could send them, creating a queue.',fix:'Eight workers were restored. The queue was cleared while the checks that prevent duplicate messages stayed active.',outcome:'In the simulation, 1,280 queued updates fell to zero. Typical worst-case delay fell from 38 minutes to two seconds. No duplicate messages were sent.',limits:['Read queue size, delivery receipts, and worker settings.','Restore eight notification workers.','Restart workers only after human approval.','Test delivery and the checks that prevent duplicate messages.'],never:['Bypass duplicate-message protection.','Change orders or customer contact details.'],blocked:'The agent proposed turning off duplicate-message protection to clear the queue faster. Black Box rejected it. The protection stayed active.',advice:'Do not trade fewer delays for duplicate customer messages.'},
+'BB-1046':{cause:'A release turned off saved search results. Every search went to the slower search system, increasing response time to 2.8 seconds.',fix:'The saved-results feature was turned back on and tested with sample searches. Product rankings were not changed.',outcome:'In the simulation, search response time fell from 2.8 seconds to 180 milliseconds. Saved results served 94% of requests. The first 20 result IDs stayed unchanged.',limits:['Read search timing, saved-result use, and release settings.','Turn saved query results back on.','Restart search workers only after human approval.','Test sample searches and check that results stay unchanged.'],never:['Export customers\' actual search histories.','Change rankings, product data, or customer profiles.'],blocked:'The agent proposed exporting customer search histories to an external tuning service. Black Box rejected it. No customer histories were sent.',advice:'Use sample searches for tuning, not customer histories. Ranking changes need separate permission.'}
+};
+function briefFacts(x){
+ const issue=x.issue,copy=BRIEF_COPY[issue.id]||{},e=x.entries||[];
+ const complete=e.some(t=>t.action==='Task complete');
+ const repaired=e.some(t=>t.action==='Restarted selected service'&&t.kind==='g');
+ const blocked=e.filter(t=>t.kind==='r');
+ const signed=!!x.signed&&e.some(t=>t.action==='Human sign-off');
+ const verified=verifySaved(e);
+ const old=!issue.blockedDetail||e.some(t=>t.action==='Denied: public upload');
+ return {copy,issue,e,complete,repaired,blocked,signed,verified,old};
+}
+function makeBriefPDF(x){
+ const f=briefFacts(x),{copy:c,issue:i}=f;
+ // PDF standard fonts use ASCII here; punctuation is normalized before byte counting.
+ const ascii=t=>String(t??'').replace(/[\u2018\u2019]/g,"'").replace(/[\u201c\u201d]/g,'"').replace(/[\u2013\u2014\u2192]/g,'-').replace(/[^\x20-\x7e\n]/g,' ');
+ const escape=t=>ascii(t).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
+ const pages=[];let commands=[],y=0;
+ function text(t,x,y,size=11,bold=false,white=false){commands.push(`${white?'1':'0.12'} g BT /${bold?'F2':'F1'} ${size} Tf 1 0 0 1 ${x} ${y} Tm (${escape(t)}) Tj ET`)}
+ function rule(y){commands.push(`0.8 G 0.5 w 44 ${y} m 551 ${y} l S`)}
+ function wrap(t,size=11){const max=76;const lines=[];for(const para of ascii(t).split('\n')){let line='';for(const word of para.split(/\s+/)){if((line+' '+word).trim().length>max&&line){lines.push(line);line=word}else line=(line+' '+word).trim()}lines.push(line)}return lines;}
+ function paragraph(t){for(const line of wrap(t)){text(line,44,y);y-=16}y-=10;}
+ function section(title,t){text(title,44,y,12,true);y-=23;paragraph(t)}
+ function start(page){commands=[];commands.push('0.04 g 0 724 595 118 re f');text('BLACK BOX',44,797,11,true,true);text('Incident brief',44,766,24,true,true);text('For non-technical teams | Offline demo report',44,744,10,false,true);y=697;text('SIMULATED INCIDENT - NOT A REAL SERVICE REPORT',44,y,10,true);y-=28;rule(42);text('Black Box | '+i.id+' | Demo evidence, not independent proof',44,26,9);text(page+' / 2',519,26,9)}
+ start(1);
+ text(i.title,44,y,18,true);y-=27;
+ paragraph('Record '+i.id+' | '+i.service+' | Completed: '+(x.ended||'Not recorded'));
+ section('What happened',c.cause||i.cause||i.impact);
+ section('What was fixed',f.repaired?(c.fix||i.fix):'This record does not confirm a completed repair. Do not treat the issue as fixed.');
+ section('Result',f.complete?(c.outcome||i.result):'The task is not recorded as complete. Recovery results are not confirmed.');
+ section('What Black Box stopped',f.blocked.length?(f.old?'The agent proposed a public upload of internal diagnostic material. It was denied. No external write was recorded.':c.blocked||i.blockedDetail):'No blocked attempt is recorded in this session.');
+ section('Human decision',f.signed?'Signed off by '+(x.signedBy||i.reviewer||'Demo reviewer')+' at '+(x.signedAt||'time not recorded')+'. Demo password check only; this is not verified employee identity.': 'Human sign-off is still pending. This brief is not an approval.');
+ pages.push(commands.join('\n'));
+ start(2);
+ text('Boundaries and confidence',44,y,18,true);y-=30;
+ section('What the agent was allowed to do',(c.limits||i.allowed||[]).map(t=>'- '+t).join('\n'));
+ section('What the agent could never do',(c.never||i.forbidden||[]).map(t=>'- '+t).join('\n'));
+ section('Record check',f.verified?'The '+f.e.length+' recorded events passed the local integrity check when this PDF was made. Changing a saved event would break that check.': 'WARNING: the record failed its integrity check. Do not rely on the repair, decision, or event details until the record is checked.');
+ section('Advice for the receiving team',c.advice||i.advisory||'Inspect the original record before relying on the result.');
+ section('What this report does not prove','All incidents, service results, and reviewer roles are simulated. The check detects changes to the saved event list; it does not prove events really happened or identify who clicked sign-off. This PDF is a snapshot, not a signed or tamper-proof certificate.');
+ pages.push(commands.join('\n'));
+ const obj=[];obj[1]='<< /Type /Catalog /Pages 2 0 R >>';obj[2]='<< /Type /Pages /Kids [5 0 R 7 0 R] /Count 2 >>';obj[3]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';obj[4]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>';
+ pages.forEach((content,n)=>{const id=5+n*2;obj[id]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${id+1} 0 R >>`;obj[id+1]=`<< /Length ${content.length} >>\nstream\n${content}\nendstream`});
+ let pdf='%PDF-1.4\n',offsets=[0];for(let n=1;n<obj.length;n++){offsets[n]=pdf.length;pdf+=`${n} 0 obj\n${obj[n]}\nendobj\n`}const xref=pdf.length;pdf+=`xref\n0 ${obj.length}\n0000000000 65535 f \n`;for(let n=1;n<obj.length;n++)pdf+=String(offsets[n]).padStart(10,'0')+' 00000 n \n';pdf+=`trailer\n<< /Size ${obj.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;return new Uint8Array([...pdf].map(c=>c.charCodeAt(0)));
+}
+function downloadBrief(n){
+ const x=sessions[n];if(!x)return;
+ const bytes=makeBriefPDF(x),blob=new Blob([bytes],{type:'application/pdf'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download=x.issue.id+'-incident-brief.pdf';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+ const note=$('pdfNote');if(note)note.textContent='PDF created on this device. Open it from Chrome Downloads to view or share. No report was sent to anyone.';
+}
+function downloadCurrentBrief(){const n=sessions.findIndex(x=>x.id===sessionId);if(n>=0)downloadBrief(n)}
+const v9Workspace=workspace;workspace=function(issue){v9Workspace(issue);const body=$('signoffPanel').querySelector('.cbody');body.insertAdjacentHTML('beforeend','<div class="pdfBrief"><button class="btn ghost" onclick="downloadCurrentBrief()">Download PDF brief</button><p id="pdfNote">A two-page, plain-language brief for other teams. Created offline; sharing is up to you. If sign-off is pending, the PDF says so.</p></div>')};
+const v9OpenRecord=openRecord;openRecord=function(n){v9OpenRecord(n);document.querySelector('#recordDetail .detail-head').insertAdjacentHTML('beforeend','<button class="btn ghost" onclick="downloadBrief('+n+')">Download PDF brief</button>')};
+if(params.has('preview')){runId++;inbox();startIssue(Number(params.get('issue')||0),params.get('preview'));if(pageQuery)navigate(pageQuery)}
+
+const v10Workspace=workspace;workspace=function(issue){
+ v10Workspace(issue);const main=$('main'),flow=main.querySelector('.workflow'),rail=flow.querySelector('.stagebar'),grid=flow.querySelector('.grid');
+ main.classList.add('task-layout');
+ const header=document.createElement('header');header.className='task-header';flow.before(header);
+ for(const selector of ['.crumb','.mainhead','.tasksubtitle'])header.appendChild(main.querySelector(selector));
+ header.querySelector('.tasksubtitle').innerHTML=esc(issue.service)+'<span class="impact"> · '+esc(issue.impact)+'</span>';
+ const railPanel=document.createElement('aside');railPanel.className='rail-panel';rail.before(railPanel);railPanel.appendChild(rail);
+ const meta=document.createElement('div');meta.className='rail-meta';meta.innerHTML='<div class="rail-label">Agent on task</div><b class="agent-name">'+esc(issue.agent)+'</b><div>'+esc(issue.id)+' · local demo</div><div id="railState">Warrant issued</div><div class="rail-chain" id="railChain">Record: collecting</div>';
+ railPanel.appendChild(meta);meta.appendChild($('warrantBody').querySelector('.expiry'));
+ grid.addEventListener('scroll',updateJump,{passive:true});updateRailStatus();updateJump();
+};
+function updateRailStatus(){const state=$('railState'),chain=$('railChain');if(!state)return;const f=document.querySelector('.workflow'),n=Number(f?.dataset.stage||0);state.textContent=['Warrant issued','Investigating','Checking limits','Review ready','Awaiting sign-off'][n];if(entries.at(-1)?.action==='Human sign-off')state.textContent='Signed off';if(chain)chain.textContent=running?'Record: collecting':entries.length?(verifyChain()?'Record: verified':'Record: mismatch'):'Record: collecting';}
+const v10Stage=stage;stage=function(n){v10Stage(n);updateRailStatus()};
+const v10Finish=finishRun;finishRun=function(){v10Finish();updateRailStatus()};
+const v10Sign=signOff;signOff=function(){v10Sign();updateRailStatus()};
+const v10Inbox=inbox;inbox=function(){$('main').classList.remove('task-layout');v10Inbox()};
+updateJump=function(){const chip=$('jumpCurrent'),flow=document.querySelector('.workflow');if(!chip||!flow)return;const n=Number(flow.dataset.stage),p=$(V7_PANELS[n]),grid=flow.querySelector('.grid');const r=p.getBoundingClientRect(),m=grid.getBoundingClientRect();chip.hidden=activePage!=='Agents'||(r.top>=m.top-20&&r.top<m.bottom-120);chip.textContent='Jump to '+(n+1)+' · '+['Warrant','Investigate','Enforce limits','Review','Sign off'][n]+' ↓'};
+// Clear workflow-only layout on other pages, restoring it on returning to Agents.
+const v10Navigate=navigate;navigate=function(page){$('main').classList.toggle('task-layout',page==='Agents'&&!!document.querySelector('.workflow'));v10Navigate(page)};
+if(params.has('preview')){runId++;inbox();startIssue(Number(params.get('issue')||0),params.get('preview'));if(pageQuery)navigate(pageQuery)}
+
+jumpToStage=function(n){const p=$(V7_PANELS[n]),grid=document.querySelector('.workflow .grid');if(!p?.classList.contains('revealed')||!grid)return;const top=p.getBoundingClientRect().top-grid.getBoundingClientRect().top+grid.scrollTop-20;grid.scrollTo({top:Math.max(0,top),behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})};
+
+let headerProgress=0,headerTarget=0,headerFrame=0;
+function setHeaderProgress(value,reset=false){
+ headerTarget=Math.max(0,Math.min(1,value));const header=document.querySelector('.task-header');if(!header)return;
+ const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ if(reset||reduced){headerProgress=headerTarget;header.style.setProperty('--header-front',(-25+150*headerProgress)+'%');syncHeaderInk(header);if(headerFrame)cancelAnimationFrame(headerFrame);headerFrame=0;return}
+ if(headerFrame)return;let previous=0;
+ function animate(t){if(!header.isConnected){headerFrame=0;return}const delta=previous?Math.min(80,t-previous):16;previous=t;headerProgress+=(headerTarget-headerProgress)*(1-Math.exp(-delta/1100));if(Math.abs(headerTarget-headerProgress)<.0007)headerProgress=headerTarget;header.style.setProperty('--header-front',(-25+150*headerProgress).toFixed(3)+'%');syncHeaderInk(header);if(headerProgress!==headerTarget)headerFrame=requestAnimationFrame(animate);else headerFrame=0}
+ headerFrame=requestAnimationFrame(animate);
+}
+const v11Workspace=workspace;workspace=function(issue){if(headerFrame)cancelAnimationFrame(headerFrame);headerFrame=0;headerProgress=0;headerTarget=0;v11Workspace(issue);setHeaderProgress(0,true)};
+const v11Stage=stage;stage=function(n){v11Stage(n);setHeaderProgress([0,.15,.6,.88,1][n])};
+const v11Log=logEntry;logEntry=function(action,detail,kind,meta={}){const e=v11Log(action,detail,kind,meta);const n=Number(document.querySelector('.workflow')?.dataset.stage||0);if(n===1)setHeaderProgress(Math.min(.57,.15+Math.max(0,entries.length-1)*.065));if(n===2)setHeaderProgress(Math.min(.86,.6+Math.max(0,entries.length-7)*.045));return e};
+if(params.has('preview')){runId++;inbox();startIssue(Number(params.get('issue')||0),params.get('preview'));if(pageQuery)navigate(pageQuery)}
+
+function syncHeaderInk(header=document.querySelector('.task-header')){if(!header)return;const r=header.getBoundingClientRect(),front=((-25+150*headerProgress)/100-.025)*r.width;for(const el of header.querySelectorAll('.crumb,.back,h1,.tasksubtitle,#statusPill')){const offset=el.getBoundingClientRect().left-r.left;el.style.setProperty('--ink-width',r.width+'px');el.style.setProperty('--ink-offset',-offset+'px');el.style.setProperty('--ink-split',front+'px')}}
+window.addEventListener('resize',()=>syncHeaderInk());
+
+function employeeSignForm(prefix){return `<div class="employee-sign"><label>Initiating employee<select id="${prefix}-employee" aria-label="Initiating employee"><option value="">Select employee</option><option>Saeid</option><option>James</option><option>Emma</option><option>Daniel</option></select></label><label>Password<input id="${prefix}-password" type="password" placeholder="Password" autocomplete="off" aria-label="Demo password"></label></div><div class="sign-error" id="${prefix}-error" role="alert"></div>`}
+function checkEmployeeSign(prefix){const name=$(prefix+'-employee')?.value,password=$(prefix+'-password'),error=$(prefix+'-error');if(!name){if(error)error.textContent='Select the employee who initiated this task.';return null}if(password?.value!=='1234'){if(error)error.textContent='Incorrect demo password.';return null}if(error)error.textContent='';password.value='';return name}
+const v12Workspace=workspace;workspace=function(issue){v12Workspace(issue);const button=$('signoffBtn');button.insertAdjacentHTML('beforebegin',employeeSignForm('task'));button.textContent='Sign off';button.onclick=()=>signOff();button.insertAdjacentHTML('afterend','<div class="demo-sign-note">Demo password: 1234</div>');$('task-password').addEventListener('keydown',e=>{if(e.key==='Enter')signOff()})};
+const v12Sign=signOff;signOff=function(){if(!verifyChain()||$('certOvl').classList.contains('show')||entries.at(-1)?.action==='Human sign-off')return;const employee=checkEmployeeSign('task');if(!employee)return;selected.reviewer=employee;v12Sign()};
+if(params.has('preview')){runId++;inbox();startIssue(Number(params.get('issue')||0),params.get('preview'));if(pageQuery)navigate(pageQuery)}
+</script></body></html>
