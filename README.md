@@ -1,4 +1,4 @@
-![Black Box banner](https://github.com/user-attachments/assets/78603ca3-a189-4eee-a189-7810aa112a45)
+![Black Box banner](https://github.com/user-attachments/assets/6e318374-4b2a-4eea-a3b0-4d4bbf10d9f0)
 
 # Black Box
 
@@ -7,6 +7,8 @@
 A hackathon prototype by **Saeid Hashim**.
 
 Give an agent clear boundaries. Watch its work. Keep the blocked attempts in the record. Let a human make the final decision.
+
+Built as one complete HTML file: HTML, CSS, and JavaScript together. Event judges can open it free in a browser, with no install or backend server to set up.
 
 ![Black Box overview](https://github.com/user-attachments/assets/d50a005f-de0f-4d3c-a8f8-806935c7532b)
 
